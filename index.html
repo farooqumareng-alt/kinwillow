@@ -151,14 +151,35 @@
   <div id="concierge" style="margin-top:44px;border-top:1px solid #35543f;padding-top:36px">
     <h2 style="font-size:26px">Prefer it done with you?</h2>
     <p>Book a founding setup session: we organise your entire vault with you over Zoom, in about an hour. <strong style="color:#fff">$29 deposit, fully refundable.</strong> Limited founding spots.</p>
-    <a class="btn sans" href="mailto:info@kinwillow.com?subject=Founding%20setup%20session" style="background:#fff;color:var(--green-dark);font-weight:bold">Request a setup session</a>
+    <a class="btn sans" href="#contact" id="concierge-btn" style="background:#fff;color:var(--green-dark);font-weight:bold">Request a setup session</a>
   </div>
+</div>
+
+<div class="section" id="contact">
+  <h2>Contact us</h2>
+  <p>Questions about the checklist, a setup session, or KinWillow itself — send us a message and a person will reply. We don't publish an email address here; this form reaches us just the same, without feeding the spammers.</p>
+  <form id="contact-form" class="sans" style="max-width:560px;margin-top:18px">
+    <input type="text" id="c-name" placeholder="Your name" required aria-label="Your name" style="width:100%;padding:12px;border:1px solid #c9cfc4;border-radius:8px;margin-bottom:10px;font-size:16px">
+    <input type="email" id="c-email" placeholder="Your email address" required aria-label="Your email address" style="width:100%;padding:12px;border:1px solid #c9cfc4;border-radius:8px;margin-bottom:10px;font-size:16px">
+    <select id="c-topic" aria-label="What is this about?" style="width:100%;padding:12px;border:1px solid #c9cfc4;border-radius:8px;margin-bottom:10px;font-size:16px;background:#fff">
+      <option value="general">General question</option>
+      <option value="setup-session">Founding setup session ($29 deposit)</option>
+      <option value="checklist">The free checklist</option>
+      <option value="parents">KinWillow for my parents</option>
+      <option value="other">Something else</option>
+    </select>
+    <textarea id="c-message" placeholder="Your message" required rows="5" aria-label="Your message" style="width:100%;padding:12px;border:1px solid #c9cfc4;border-radius:8px;margin-bottom:10px;font-size:16px"></textarea>
+    <input type="text" id="c-website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+    <button class="btn btn-primary" type="submit" id="c-btn">Send message</button>
+  </form>
+  <div class="done-msg" id="c-done">Thank you — your message is on its way. We usually reply within one business day.</div>
+  <div class="done-msg" id="c-fail" style="background:#f7e6e6">That didn't send — please try again in a moment.</div>
 </div>
 
 <footer class="sans">
   <p><strong>KinWillow</strong> · Everything your family would need, in one safe place.</p>
   <p style="margin-top:8px">KinWillow is not a law firm and does not provide legal advice. It is an organisational tool that works alongside your will and estate documents.</p>
-  <p style="margin-top:8px">© 2026 KinWillow · <a href="mailto:info@kinwillow.com">info@kinwillow.com</a></p>
+  <p style="margin-top:8px">© 2026 KinWillow · <a href="#contact">Contact us</a></p>
 </footer>
 
 <script>
@@ -179,6 +200,36 @@ document.getElementById('signup-form').addEventListener('submit', function(e){
     document.getElementById('fallback-msg').style.display = 'block';
   }).finally(function(){
     btn.disabled = false; btn.textContent = 'Send me the checklist';
+  });
+});
+
+document.getElementById('concierge-btn').addEventListener('click', function(){
+  document.getElementById('c-topic').value = 'setup-session';
+});
+
+document.getElementById('contact-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  var btn = document.getElementById('c-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  fetch('/api/contact', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name: document.getElementById('c-name').value,
+      email: document.getElementById('c-email').value,
+      topic: document.getElementById('c-topic').value,
+      message: document.getElementById('c-message').value,
+      website: document.getElementById('c-website').value
+    })
+  }).then(function(r){
+    var id = r.ok ? 'c-done' : 'c-fail';
+    document.getElementById(id).style.display = 'block';
+    document.getElementById(id).scrollIntoView({behavior:'smooth', block:'center'});
+    if (r.ok) document.getElementById('contact-form').reset();
+  }).catch(function(){
+    document.getElementById('c-fail').style.display = 'block';
+  }).finally(function(){
+    btn.disabled = false; btn.textContent = 'Send message';
   });
 });
 </script>
