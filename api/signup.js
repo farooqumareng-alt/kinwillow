@@ -58,7 +58,7 @@ module.exports = async function handler(req, res) {
       }).catch(function () {});
     };
     await send({
-      from: "KinWillow <hello@kinwillow.com>",
+      from: "KinWillow <info@kinwillow.com>",
       to: [email],
       subject: "Your Family Continuity Checklist — from KinWillow",
       html:
@@ -74,7 +74,7 @@ module.exports = async function handler(req, res) {
     });
     if (process.env.NOTIFY_EMAIL) {
       await send({
-        from: "KinWillow <hello@kinwillow.com>",
+        from: "KinWillow <info@kinwillow.com>",
         to: [process.env.NOTIFY_EMAIL],
         subject: "New KinWillow checklist signup",
         html: "<p>New founding-list signup: <strong>" + email + "</strong></p>",
