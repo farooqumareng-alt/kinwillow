@@ -140,13 +140,13 @@
 <div class="signup" id="checklist">
   <h2>Start with the free checklist</h2>
   <p>The Family Continuity Checklist is the paper version of the vault — 10 sections covering everything your family would need. Tell us where to send it, and it's yours.</p>
-  <!-- EMAIL CAPTURE: endpoint to be connected (see notes). Until then, the form reveals the direct download. -->
   <form id="signup-form" class="sans">
     <input type="email" id="email" placeholder="Your email address" required aria-label="Email address">
-    <button class="btn btn-primary" type="submit" style="background:var(--accent);color:var(--green-dark);font-weight:bold">Send me the checklist</button>
+    <button class="btn btn-primary" type="submit" id="signup-btn" style="background:var(--accent);color:var(--green-dark);font-weight:bold">Send me the checklist</button>
   </form>
   <p class="form-note sans">One email with your checklist. No spam, no selling your address — ever.</p>
-  <div class="done-msg" id="done-msg">Thank you — your checklist is ready: <a href="Family-Continuity-Checklist.pdf" download><strong>Download the Family Continuity Checklist (PDF)</strong></a></div>
+  <div class="done-msg" id="done-msg">Thank you — you're on the founding list, and your checklist is ready: <a href="Family-Continuity-Checklist.pdf" download><strong>Download the Family Continuity Checklist (PDF)</strong></a></div>
+  <div class="done-msg" id="fallback-msg" style="background:#f7f1e6">The list signup hiccuped, but your checklist is on us either way: <a href="Family-Continuity-Checklist.pdf" download><strong>Download the Family Continuity Checklist (PDF)</strong></a></div>
 
   <div id="concierge" style="margin-top:44px;border-top:1px solid #35543f;padding-top:36px">
     <h2 style="font-size:26px">Prefer it done with you?</h2>
@@ -165,9 +165,21 @@
 document.getElementById('signup-form').addEventListener('submit', function(e){
   e.preventDefault();
   var email = document.getElementById('email').value;
-  try { localStorage.setItem('kinwillow_signup', email); } catch (err) {}
-  document.getElementById('done-msg').style.display = 'block';
-  document.getElementById('done-msg').scrollIntoView({behavior:'smooth', block:'center'});
+  var btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.textContent = 'One moment…';
+  fetch('/api/signup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email: email})
+  }).then(function(r){
+    var target = r.ok ? 'done-msg' : 'fallback-msg';
+    document.getElementById(target).style.display = 'block';
+    document.getElementById(target).scrollIntoView({behavior:'smooth', block:'center'});
+  }).catch(function(){
+    document.getElementById('fallback-msg').style.display = 'block';
+  }).finally(function(){
+    btn.disabled = false; btn.textContent = 'Send me the checklist';
+  });
 });
 </script>
 </body>
