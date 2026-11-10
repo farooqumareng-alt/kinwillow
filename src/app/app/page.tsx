@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { healthScore, effectiveState, type VerifiedState } from "@/lib/continuity";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,8 @@ export default async function Dashboard() {
   let itemCount = 0;
   let sectionsStarted = 0;
   let docCount = 0;
+  let readinessScore: number | null = null;
+  let attentionCount = 0;
   if (household) {
     const { data: membershipRow } = await supabase
       .from("household_members")
@@ -51,6 +54,22 @@ export default async function Dashboard() {
         .select("id", { count: "exact", head: true })
         .eq("household_id", hid);
       docCount = dc ?? 0;
+      const { data: recs } = await supabase
+        .from("continuity_records")
+        .select("verified_state, criticality, recheck_due")
+        .eq("household_id", hid);
+      if (recs) {
+        const typed = recs as unknown as Array<{
+          verified_state: VerifiedState;
+          criticality: string;
+          recheck_due: string | null;
+        }>;
+        readinessScore = healthScore(typed);
+        attentionCount = typed.filter((r) => {
+          const s = effectiveState(r);
+          return s === "stale" || s === "drift_suspected" || s === "not_started";
+        }).length;
+      }
     }
   }
 
@@ -75,10 +94,12 @@ export default async function Dashboard() {
       <div className="grid">
         <div className="panel">
           <h3>Readiness score</h3>
-          <div className="score">—</div>
+          <div className="score">{readinessScore === null ? "—" : `${readinessScore}%`}</div>
           <p>
-            Your score appears once you add accounts and verify their legacy settings in the
-            Continuity Centre (Stage 2d).
+            {readinessScore === null
+              ? "Your score appears once you start a legacy check in the Continuity Centre."
+              : "Based on the verified legacy settings of the accounts you track."}{" "}
+            <a href="/app/continuity">Open the Continuity Centre →</a>
           </p>
         </div>
         <div className="panel">
@@ -97,8 +118,10 @@ export default async function Dashboard() {
         <div className="panel">
           <h3>Needs attention</h3>
           <p>
-            Nothing needs attention. Drift and staleness alerts for your providers&rsquo; legacy
-            settings will appear here (Stage 2d).
+            {attentionCount === 0
+              ? "Nothing needs attention right now."
+              : `${attentionCount} legacy check${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} attention — not started, stale, or drifting.`}{" "}
+            {attentionCount > 0 && <a href="/app/continuity">Review →</a>}
           </p>
         </div>
       </div>
