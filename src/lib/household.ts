@@ -40,6 +40,10 @@ export interface InventoryItem {
   section: number | null;
   title: string;
   provider_name: string | null;
+  location: string | null;
+  last4: string | null;
+  account_type: string | null;
+  slot_key: string | null;
   notes: string | null;
   criticality: string;
   renewal_date: string | null;

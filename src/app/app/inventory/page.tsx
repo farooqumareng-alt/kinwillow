@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getMyHousehold, type InventoryItem } from "@/lib/household";
-import { CATEGORY_LABELS, type Category } from "@/lib/sections";
+import { CATEGORY_LABELS, ACCOUNT_TYPES, COMMON_INSTITUTIONS, type Category } from "@/lib/sections";
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as Category[];
 
@@ -14,7 +14,7 @@ export default function InventoryPage() {
   const [filter, setFilter] = useState<string>("all");
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ title: "", category: "account" as Category, provider_name: "", criticality: "medium", renewal_date: "", notes: "" });
+  const [form, setForm] = useState({ title: "", category: "account" as Category, provider_name: "", location: "", account_type: "", last4: "", criticality: "medium", renewal_date: "", notes: "" });
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -50,13 +50,16 @@ export default function InventoryPage() {
       title: form.title.trim(),
       category: form.category,
       provider_name: form.provider_name.trim() || null,
+      location: form.location.trim() || null,
+      account_type: form.category === "account" ? form.account_type || null : null,
+      last4: form.category === "account" ? form.last4.replace(/\D/g, "").slice(0, 4) || null : null,
       criticality: form.criticality,
       renewal_date: form.renewal_date || null,
       notes: form.notes.trim() || null,
     });
     if (error) setError(error.message);
     else {
-      setForm({ title: "", category: "account", provider_name: "", criticality: "medium", renewal_date: "", notes: "" });
+      setForm({ title: "", category: "account", provider_name: "", location: "", account_type: "", last4: "", criticality: "medium", renewal_date: "", notes: "" });
       await load();
     }
     setBusy(false);
@@ -70,6 +73,8 @@ export default function InventoryPage() {
 
   return (
     <main>
+      <datalist id="kw-institutions">{COMMON_INSTITUTIONS.map((i) => (<option key={i} value={i} />))}</datalist>
+      <datalist id="kw-locations">{Array.from(new Set(items.map((i) => i.location).filter(Boolean))).map((l) => (<option key={l as string} value={l as string} />))}</datalist>
       <h1 style={{ fontSize: 32, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 6 }}>
         Your vault
       </h1>
@@ -88,7 +93,15 @@ export default function InventoryPage() {
               <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
             ))}
           </select>
-          <input type="text" placeholder="Provider / institution" value={form.provider_name} onChange={(e) => setForm({ ...form, provider_name: e.target.value })} />
+          <input type="text" list="kw-institutions" placeholder="Provider / institution" value={form.provider_name} onChange={(e) => setForm({ ...form, provider_name: e.target.value })} />
+          <input type="text" list="kw-locations" placeholder="Where is it stored?" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          {form.category === "account" && (<>
+            <select value={form.account_type} onChange={(e) => setForm({ ...form, account_type: e.target.value })}>
+              <option value="">Account type…</option>
+              {ACCOUNT_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}
+            </select>
+            <input type="text" inputMode="numeric" maxLength={4} placeholder="Last 4 digits" value={form.last4} onChange={(e) => setForm({ ...form, last4: e.target.value.replace(/\D/g, "") })} />
+          </>)}
           <select value={form.criticality} onChange={(e) => setForm({ ...form, criticality: e.target.value })}>
             <option value="high">High importance</option>
             <option value="medium">Medium importance</option>
@@ -132,6 +145,9 @@ export default function InventoryPage() {
               <div style={{ fontSize: 13, color: "var(--muted)" }}>
                 {CATEGORY_LABELS[item.category as Category] ?? item.category}
                 {item.provider_name ? ` · ${item.provider_name}` : ""}
+                {item.account_type ? ` · ${item.account_type}` : ""}
+                {item.last4 ? ` · ····${item.last4}` : ""}
+                {item.location ? ` · 📍 ${item.location}` : ""}
                 {item.section ? ` · Checklist §${item.section}` : ""}
                 {item.renewal_date ? ` · renews ${item.renewal_date}` : ""}
                 {item.criticality === "high" ? " · ★ high importance" : ""}

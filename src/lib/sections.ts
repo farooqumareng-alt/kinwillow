@@ -138,3 +138,45 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   person: "Person",
   other: "Other",
 };
+
+export const ACCOUNT_TYPES = [
+  "Checking",
+  "Savings",
+  "Money market",
+  "CD",
+  "Credit card",
+  "Investment",
+  "Retirement (401k/IRA)",
+  "Mortgage",
+  "Loan",
+  "Insurance policy",
+  "Other",
+];
+
+export const COMMON_INSTITUTIONS = [
+  "Chase", "Bank of America", "Wells Fargo", "Citi", "Capital One",
+  "US Bank", "PNC", "Truist", "TD Bank", "Fifth Third", "Regions",
+  "American Express", "Discover", "Fidelity", "Vanguard", "Schwab",
+  "E*TRADE", "Robinhood", "SoFi", "Ally", "Marcus", "Navy Federal",
+  "USAA", "PenFed", "Alliant", "Fort Worth Community Credit Union",
+  "EECU", "Texas Trust Credit Union",
+];
+
+export interface EssentialSlot {
+  key: string;
+  title: string;
+  hint: string;
+}
+
+// Section 3 ("The essentials") as ready-made slots: the user only answers
+// "where is it?" (one tap, once locations are remembered) or "don't have one".
+export const ESSENTIAL_SLOTS: EssentialSlot[] = [
+  { key: "will", title: "Will", hint: "Where is the signed original? Which attorney prepared it?" },
+  { key: "poa", title: "Power of attorney", hint: "Where is the signed original stored?" },
+  { key: "healthcare-directive", title: "Healthcare directive", hint: "Advance directive / living will — where is it stored?" },
+  { key: "passport", title: "Passport", hint: "Where is it kept?" },
+  { key: "drivers-license", title: "Driver's license", hint: "Usually your wallet — note that, or where a copy lives." },
+  { key: "birth-certificate", title: "Birth certificate", hint: "Where is the certified copy?" },
+  { key: "deeds-titles", title: "Property deeds & vehicle titles", hint: "Where are they stored?" },
+  { key: "safe", title: "Safe / lockbox", hint: "Where it is, and where the code or key is kept — never the code itself." },
+];

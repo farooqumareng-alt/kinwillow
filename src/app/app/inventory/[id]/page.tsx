@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { InventoryItem } from "@/lib/household";
-import { CATEGORY_LABELS, type Category } from "@/lib/sections";
+import { CATEGORY_LABELS, ACCOUNT_TYPES, COMMON_INSTITUTIONS, type Category } from "@/lib/sections";
 
 interface Doc {
   id: string;
@@ -130,7 +130,19 @@ export default function ItemDetailPage() {
         <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 10 }}>Title</label>
         <input type="text" defaultValue={item.title} key={`t-${item.id}`} onBlur={(e) => e.target.value.trim() && e.target.value !== item.title && save("title", e.target.value.trim())} style={{ width: "100%" }} />
         <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Provider / institution</label>
-        <input type="text" defaultValue={item.provider_name ?? ""} key={`p-${item.id}`} onBlur={(e) => save("provider_name", e.target.value.trim() || null)} style={{ width: "100%" }} />
+        <input type="text" list="kw-institutions-detail" defaultValue={item.provider_name ?? ""} key={`p-${item.id}`} onBlur={(e) => save("provider_name", e.target.value.trim() || null)} style={{ width: "100%" }} />
+        <datalist id="kw-institutions-detail">{COMMON_INSTITUTIONS.map((i) => (<option key={i} value={i} />))}</datalist>
+        <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Where is it stored?</label>
+        <input type="text" defaultValue={item.location ?? ""} key={`l-${item.id}`} onBlur={(e) => save("location", e.target.value.trim() || null)} style={{ width: "100%" }} />
+        {item.category === "account" && (<>
+          <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Account type</label>
+          <select defaultValue={item.account_type ?? ""} key={`at-${item.id}`} onChange={(e) => save("account_type", e.target.value || null)} style={{ width: "100%" }}>
+            <option value="">—</option>
+            {ACCOUNT_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}
+          </select>
+          <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Last 4 digits (never the full number)</label>
+          <input type="text" inputMode="numeric" maxLength={4} defaultValue={item.last4 ?? ""} key={`l4-${item.id}`} onBlur={(e) => save("last4", e.target.value.replace(/\D/g, "").slice(0, 4) || null)} style={{ width: 120 }} />
+        </>)}
         <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
           Notes — where it lives and how recovery works. <strong>Never a password.</strong>
         </label>
