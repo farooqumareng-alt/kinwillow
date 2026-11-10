@@ -1,0 +1,6 @@
+Supabase Auth email template subjects (set alongside each template in the dashboard):
+confirmation.html	Confirm your KinWillow account
+recovery.html	Reset your KinWillow password
+magic_link.html	Your KinWillow sign-in link
+email_change.html	Confirm your new KinWillow email address
+invite.html	You've been invited to KinWillow

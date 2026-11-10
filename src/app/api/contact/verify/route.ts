@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: "KinWillow site <info@kinwillow.com>",
+          from: "KinWillow <info@kinwillow.com>",
           to: ["info@kinwillow.com"],
           reply_to: pending.email,
           subject: `Website message (${pending.topic}) from ${pending.name} — verified`,

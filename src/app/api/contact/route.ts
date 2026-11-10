@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { brandedEmail } from "@/lib/email";
 import crypto from "node:crypto";
 
 // Contact form step 1 — ported from the Stage 1 serverless function.
@@ -65,6 +66,13 @@ export async function POST(req: Request) {
         from: "KinWillow <info@kinwillow.com>",
         to: [cleanEmail],
         subject: "Your KinWillow verification code",
+        html: brandedEmail({
+          heading: "Verify your email address",
+          bodyHtml:
+            `<p>Your KinWillow verification code is:</p><p style="font-size:30px;letter-spacing:6px;color:#1f4030;text-align:center;margin:20px 0;"><strong>${code}</strong></p>` +
+            "<p>Enter it on the KinWillow contact page to send your message. The code expires in 15 minutes.</p>",
+          footnote: "If you didn't request this code, you can safely ignore this email.",
+        }),
         text:
           `Your verification code is ${code}\n\n` +
           "Enter it on the KinWillow contact page to send your message. " +

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { brandedEmail, sendEmail } from "@/lib/email";
 import { buildPackageContent } from "@/lib/disclosure";
 
 // Owner action: once a request's waiting period has passed without a veto,
@@ -66,6 +67,30 @@ export async function POST(req: Request) {
     p_entity: "disclosure_package",
     p_entity_id: pkg.id,
   });
+
+  // Email the trusted contact their package link (best-effort).
+  try {
+    const { data: tc } = await service
+      .from("trusted_contacts")
+      .select("name, email")
+      .eq("id", request.trusted_contact_id)
+      .single();
+    if (tc?.email) {
+      await sendEmail({
+        to: tc.email,
+        subject: "Your KinWillow recovery package is ready",
+        html: brandedEmail({
+          heading: "Your recovery package is ready",
+          bodyHtml:
+            `<p>${tc.name ? `${tc.name}, ` : ""}the waiting period has ended and your KinWillow recovery package has been prepared. It contains the recovery information the account owner chose to share with you — where things are and how recovery works.</p>` +
+            `<p>This link expires on <strong>${new Date(pkg.expires_at).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })}</strong>. Please open it somewhere private.</p>`,
+          ctaLabel: "Open my recovery package",
+          ctaUrl: `https://www.kinwillow.com/package/${pkg.access_token}`,
+          footnote: "KinWillow never stores passwords. This package contains recovery pointers and instructions only.",
+        }),
+      });
+    }
+  } catch { /* notification is best-effort */ }
 
   return NextResponse.json({ package_id: pkg.id, access_token: pkg.access_token, expires_at: pkg.expires_at });
 }
