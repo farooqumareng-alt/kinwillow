@@ -21,6 +21,39 @@ export default async function Dashboard() {
   const { data: factors } = await supabase.auth.mfa.listFactors();
   const mfaOn = (factors?.totp ?? []).some((f) => f.status === "verified");
 
+  let itemCount = 0;
+  let sectionsStarted = 0;
+  let docCount = 0;
+  if (household) {
+    const { data: membershipRow } = await supabase
+      .from("household_members")
+      .select("household_id")
+      .eq("user_id", user?.id ?? "")
+      .limit(1)
+      .single();
+    const hid = membershipRow?.household_id as string | undefined;
+    if (hid) {
+      const { count } = await supabase
+        .from("inventory_items")
+        .select("id", { count: "exact", head: true })
+        .eq("household_id", hid)
+        .eq("archived", false);
+      itemCount = count ?? 0;
+      const { data: secs } = await supabase
+        .from("inventory_items")
+        .select("section")
+        .eq("household_id", hid)
+        .eq("archived", false)
+        .not("section", "is", null);
+      sectionsStarted = new Set((secs ?? []).map((r: { section: number }) => r.section)).size;
+      const { count: dc } = await supabase
+        .from("documents")
+        .select("id", { count: "exact", head: true })
+        .eq("household_id", hid);
+      docCount = dc ?? 0;
+    }
+  }
+
   return (
     <main>
       <h1 style={{ fontSize: 32, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 6 }}>
@@ -51,8 +84,14 @@ export default async function Dashboard() {
         <div className="panel">
           <h3>Your vault</h3>
           <p>
-            Nothing here yet. The guided first-hour setup and inventory arrive in Stage 2c — accounts,
-            subscriptions, documents, and devices, one section at a time.
+            <strong>{itemCount}</strong> item{itemCount === 1 ? "" : "s"} · <strong>{docCount}</strong>{" "}
+            document{docCount === 1 ? "" : "s"} · guided setup: <strong>{sectionsStarted} of 10</strong>{" "}
+            sections started.
+          </p>
+          <p style={{ marginTop: 10 }}>
+            <a href="/app/setup">Continue the guided setup →</a>
+            <br />
+            <a href="/app/inventory">Open your vault →</a>
           </p>
         </div>
         <div className="panel">
