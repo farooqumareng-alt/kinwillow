@@ -26,6 +26,8 @@ export default function ContinuityRecordPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const [record, setRecord] = useState<ContinuityRecord | null>(null);
+  const [scopeList, setScopeList] = useState<Array<{ id: string; name: string }>>([]);
+  const [scopeId, setScopeId] = useState<string>("");
   const [provider, setProvider] = useState<Provider | null>(null);
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +44,13 @@ export default function ContinuityRecordPage() {
     const { data: rec } = await supabase.from("continuity_records").select("*").eq("id", id).single();
     if (rec) {
       setRecord(rec as ContinuityRecord);
+      setScopeId((rec as unknown as { release_scope_id: string | null }).release_scope_id ?? "");
+      const { data: sc } = await supabase
+        .from("release_scopes")
+        .select("id, name")
+        .eq("household_id", (rec as ContinuityRecord).household_id)
+        .order("created_at");
+      setScopeList((sc ?? []) as Array<{ id: string; name: string }>);
       const { data: prov } = await supabase
         .from("provider_catalog")
         .select("*")
@@ -199,6 +208,33 @@ export default function ContinuityRecordPage() {
         {record.recheck_due ? ` · Re-check by ${record.recheck_due}` : ""}
         {record.designated_recipient ? ` · Contact: ${record.designated_recipient}` : ""}
       </p>
+
+      <div className="panel sans" style={{ marginBottom: 20 }}>
+        <h3>Release scope</h3>
+        <p style={{ color: "var(--muted)", marginBottom: 8 }}>
+          Which trusted contacts may receive this account in an emergency package. &ldquo;All
+          contacts&rdquo; means every contact; a named scope limits it to contacts holding that scope.
+        </p>
+        <select
+          value={scopeId}
+          onChange={async (e) => {
+            const v = e.target.value;
+            setScopeId(v);
+            const supabase = createClient();
+            await supabase
+              .from("continuity_records")
+              .update({ release_scope_id: v === "" ? null : v })
+              .eq("id", record.id);
+          }}
+        >
+          <option value="">All contacts (no scope limit)</option>
+          {scopeList.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="panel" style={{ marginBottom: 20 }}>
         <h3>Do it at {provider.name}</h3>

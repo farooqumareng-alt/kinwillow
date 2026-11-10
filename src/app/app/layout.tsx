@@ -9,6 +9,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Link href="/app/setup">Guided setup</Link>
         <Link href="/app/inventory">Your vault</Link>
         <Link href="/app/continuity">Continuity Centre</Link>
+        <Link href="/app/contacts">Contacts & scopes</Link>
+        <Link href="/app/emergency">Emergency</Link>
+        <Link href="/app/billing">Billing</Link>
+        <Link href="/app/settings">Settings</Link>
         <Link href="/app/security">Security (MFA)</Link>
         <span style={{ flex: 1 }} />
         <SignOutButton />
