@@ -15,6 +15,7 @@ export default function SiteHeader() {
         <a href="/#pricing">Pricing</a>
         <a href="/#checklist">Free checklist</a>
         <Link href="/login">Sign in</Link>
+        <Link href="/signup" style={{ fontWeight: "bold" }}>Start free</Link>
       </nav>
     </header>
   );
