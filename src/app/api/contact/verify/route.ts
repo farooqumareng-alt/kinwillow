@@ -1,31 +1,25 @@
-// KinWillow contact form — step 2: verify the 6-digit email code.
-// On success the pending message moves to the messages table, is emailed
-// to info@kinwillow.com via Resend (when configured), and the pending row
-// is deleted. Codes expire after 15 minutes and allow at most 5 attempts.
-
+import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 
-function hashCode(code, email) {
+// Contact form step 2 — ported from the Stage 1 serverless function.
+// Verifies the 6-digit code; on success the message moves to `messages`,
+// is emailed to info@kinwillow.com, and the pending row is deleted.
+function hashCode(code: string, email: string) {
   return crypto.createHash("sha256").update(`${code}:${email}`).digest("hex");
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ ok: false, error: "Method not allowed" });
-  }
-
+export async function POST(req: Request) {
   try {
-    const cleanEmail = String((req.body || {}).email || "").trim().toLowerCase();
-    const code = String((req.body || {}).code || "").trim();
+    const body = await req.json().catch(() => ({}));
+    const cleanEmail = String(body?.email || "").trim().toLowerCase();
+    const code = String(body?.code || "").trim();
     if (!/^\d{6}$/.test(code) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      return res.status(400).json({ ok: false, error: "Enter the 6-digit code from your email." });
+      return NextResponse.json({ ok: false, error: "Enter the 6-digit code from your email." }, { status: 400 });
     }
-
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceKey) {
-      return res.status(500).json({ ok: false, error: "Messaging is not configured." });
+      return NextResponse.json({ ok: false, error: "Messaging is not configured." }, { status: 500 });
     }
     const sb = {
       apikey: serviceKey,
@@ -33,20 +27,19 @@ export default async function handler(req, res) {
       "Content-Type": "application/json",
     };
     const pendingUrl = `${supabaseUrl}/rest/v1/contact_pending?email=eq.${encodeURIComponent(cleanEmail)}`;
-
     const lookup = await fetch(`${pendingUrl}&order=created_at.desc&limit=1`, { headers: sb });
-    if (!lookup.ok) return res.status(502).json({ ok: false, error: "Verification lookup failed." });
+    if (!lookup.ok) return NextResponse.json({ ok: false, error: "Verification lookup failed." }, { status: 502 });
     const rows = await lookup.json();
     const pending = rows && rows[0];
     if (!pending) {
-      return res.status(400).json({ ok: false, error: "No code is waiting for that email — please submit the form again." });
+      return NextResponse.json({ ok: false, error: "No code is waiting for that email — please submit the form again." }, { status: 400 });
     }
     if (new Date(pending.expires_at).getTime() < Date.now()) {
       await fetch(pendingUrl, { method: "DELETE", headers: sb }).catch(() => {});
-      return res.status(400).json({ ok: false, error: "That code has expired — please submit the form again for a fresh one." });
+      return NextResponse.json({ ok: false, error: "That code has expired — please submit the form again for a fresh one." }, { status: 400 });
     }
     if (pending.attempts >= 5) {
-      return res.status(429).json({ ok: false, error: "Too many attempts — please submit the form again for a fresh code." });
+      return NextResponse.json({ ok: false, error: "Too many attempts — please submit the form again for a fresh code." }, { status: 429 });
     }
     if (pending.code_hash !== hashCode(code, cleanEmail)) {
       await fetch(`${supabaseUrl}/rest/v1/contact_pending?id=eq.${pending.id}`, {
@@ -54,10 +47,8 @@ export default async function handler(req, res) {
         headers: { ...sb, Prefer: "return=minimal" },
         body: JSON.stringify({ attempts: pending.attempts + 1 }),
       }).catch(() => {});
-      return res.status(400).json({ ok: false, error: "That code doesn't match — check your email and try again." });
+      return NextResponse.json({ ok: false, error: "That code doesn't match — check your email and try again." }, { status: 400 });
     }
-
-    // Verified: move the message into the messages table.
     const insert = await fetch(`${supabaseUrl}/rest/v1/messages`, {
       method: "POST",
       headers: { ...sb, Prefer: "return=minimal" },
@@ -69,14 +60,11 @@ export default async function handler(req, res) {
       }),
     });
     if (!insert.ok) {
-      console.error("messages insert failed:", insert.status, await insert.text().catch(() => ""));
-      return res.status(502).json({ ok: false, error: "Could not save your message." });
+      return NextResponse.json({ ok: false, error: "Could not save your message." }, { status: 502 });
     }
-
-    // Email it to the KinWillow mailbox (message is already safely stored).
     const resendKey = process.env.RESEND_API_KEY;
     if (resendKey) {
-      const sent = await fetch("https://api.resend.com/emails", {
+      await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -85,17 +73,14 @@ export default async function handler(req, res) {
           reply_to: pending.email,
           subject: `Website message (${pending.topic}) from ${pending.name} — verified`,
           text:
-            `New verified message from the KinWillow contact form.\n\n` +
+            "New verified message from the KinWillow contact form.\n\n" +
             `Name: ${pending.name}\nEmail: ${pending.email} (verified)\nTopic: ${pending.topic}\n\n${pending.message}\n`,
         }),
-      });
-      if (!sent.ok) console.error("Resend contact email failed:", sent.status);
+      }).catch(() => {});
     }
-
     await fetch(pendingUrl, { method: "DELETE", headers: sb }).catch(() => {});
-    return res.status(200).json({ ok: true });
-  } catch (err) {
-    console.error("Verify handler error:", err);
-    return res.status(500).json({ ok: false, error: "Something went wrong." });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: false, error: "Something went wrong." }, { status: 500 });
   }
 }
