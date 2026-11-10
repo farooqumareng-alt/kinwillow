@@ -65,7 +65,7 @@ export default function Home() {
         <p className="lede">Annual plans only — this is a once-a-year job, and we price it that way. Monthly pricing invites the churn we&rsquo;re protecting you from.</p>
         <div className="pricing">
           <div className="tier"><h3>Free</h3><div className="price">$0</div><div className="per">to start</div><ul><li>Up to 25 items</li><li>1 trusted contact</li><li>Renewal alerts</li></ul></div>
-          <div className="tier featured"><h3>Family</h3><div className="price">$79</div><div className="per">per year</div><ul><li>Unlimited items</li><li>3 trusted contacts</li><li>Emergency access</li><li>Legacy-setting guides</li></ul></div>
+          <div className="tier featured"><h3>Family</h3><div className="price">$79</div><div className="per">per year</div><ul><li>Unlimited items</li><li>5 trusted contacts</li><li>Emergency access</li><li>Legacy-setting guides</li></ul></div>
           <div className="tier"><h3>Family + Parents</h3><div className="price">$129</div><div className="per">per year</div><ul><li>Two households</li><li>Everything in Family</li><li>Set up your parents&rsquo; vault too</li></ul></div>
         </div>
         <p className="lede sans" style={{ marginTop: 26, fontSize: 15 }}>
