@@ -74,13 +74,11 @@ footer.site{text-align:center;padding:34px 5% 44px;color:var(--muted);font-size:
 .app-nav--sidebar{flex-direction:column;align-items:stretch;gap:0;border-bottom:none;padding:14px 20px;margin-bottom:0;background:var(--card);border:1px solid var(--line);border-radius:12px}
 .app-nav--sidebar a{display:block;padding:11px 0;border-bottom:1px solid var(--line)}
 .app-nav--sidebar a:last-of-type{border-bottom:none}
-.app-sidebar-signout{margin-top:10px;padding-top:14px;border-top:1px solid var(--line)}
 @media (max-width:720px){
   .app-shell--sidebar{display:block}
   .app-sidebar{width:auto;position:static;margin-bottom:24px}
   .app-nav--sidebar{flex-direction:row;flex-wrap:wrap;gap:6px 20px;padding:12px 16px}
   .app-nav--sidebar a{display:inline-block;padding:2px 0;border-bottom:none}
-  .app-sidebar-signout{margin-top:0;padding-top:0;border-top:none}
 }
 .app-nav{display:flex;gap:22px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:28px}
 .app-nav a{color:var(--green-dark);text-decoration:none;font-size:15px}

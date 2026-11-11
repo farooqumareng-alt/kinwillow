@@ -1,5 +1,4 @@
 import Link from "next/link";
-import SignOutButton from "@/components/SignOutButton";
 
 const LINKS = [
   { href: "/app", label: "Dashboard" },
@@ -23,9 +22,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {l.label}
             </Link>
           ))}
-          <div className="app-sidebar-signout">
-            <SignOutButton />
-          </div>
         </nav>
       </aside>
       <div className="app-content">{children}</div>
