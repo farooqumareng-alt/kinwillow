@@ -44,6 +44,7 @@ export async function sendEmail(opts: {
   html: string;
   text?: string;
   replyTo?: string;
+  from?: string;
 }): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;
@@ -52,7 +53,7 @@ export async function sendEmail(opts: {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "KinWillow <info@kinwillow.com>",
+        from: opts.from ?? "KinWillow <info@kinwillow.com>",
         to: [opts.to],
         subject: opts.subject,
         html: opts.html,
