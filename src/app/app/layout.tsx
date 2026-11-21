@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AppSessionGuard from "@/components/AppSessionGuard";
 
 const LINKS = [
   { href: "/app", label: "Dashboard" },
@@ -7,9 +8,10 @@ const LINKS = [
   { href: "/app/continuity", label: "Continuity Centre" },
   { href: "/app/contacts", label: "Contacts & scopes" },
   { href: "/app/emergency", label: "Emergency" },
+  { href: "/app/activity", label: "Activity log" },
   { href: "/app/billing", label: "Billing" },
   { href: "/app/settings", label: "Settings" },
-  { href: "/app/security", label: "Security (MFA)" },
+  { href: "/app/security", label: "Security" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +26,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
       </aside>
-      <div className="app-content">{children}</div>
+      <div className="app-content">
+        <AppSessionGuard />
+        {children}
+      </div>
     </div>
   );
 }

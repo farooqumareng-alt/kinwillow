@@ -7,9 +7,10 @@ type Filter = (row: Row) => boolean;
 
 class Query implements PromiseLike<{ data: unknown; error: { message: string } | null }> {
   private filters: Filter[] = [];
-  private mode: "select" | "insert" | "update" = "select";
+  private mode: "select" | "insert" | "update" | "delete" = "select";
   private payload: Row | null = null;
   private wantSingle = false;
+  private wantMaybe = false;
   private returning = false;
 
   constructor(
@@ -31,6 +32,23 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
     this.mode = "update";
     this.payload = patch;
     this.returning = false;
+    return this;
+  }
+  delete() {
+    this.mode = "delete";
+    this.returning = false;
+    return this;
+  }
+  lt(col: string, value: string | number) {
+    this.filters.push((r) => (typeof value === "number" ? Number(r[col]) < value : String(r[col]) < value));
+    return this;
+  }
+  in(col: string, values: unknown[]) {
+    this.filters.push((r) => values.includes(r[col]));
+    return this;
+  }
+  maybeSingle() {
+    this.wantMaybe = true;
     return this;
   }
   eq(col: string, value: unknown) {
@@ -87,8 +105,13 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
     } else {
       result = rows.filter((r) => this.filters.every((f) => f(r)));
       if (this.mode === "update") result.forEach((r) => Object.assign(r, this.payload));
+      if (this.mode === "delete") {
+        const gone = new Set(result);
+        this.db.tables[this.table] = rows.filter((r) => !gone.has(r));
+      }
     }
     if (this.mode !== "select" && !this.returning) return { data: null, error: null };
+    if (this.wantMaybe) return { data: result[0] ? { ...result[0] } : null, error: null };
     if (this.wantSingle) {
       return result.length === 1
         ? { data: { ...result[0] }, error: null }
@@ -111,6 +134,16 @@ export class FakeDb {
   failTables = new Set<string>();
   audit: Row[] = [];
   users: Record<string, { email: string }> = {};
+  deletedUsers: string[] = [];
+  removedFiles: string[] = [];
+  storage = {
+    from: () => ({
+      remove: async (paths: string[]) => {
+        this.removedFiles.push(...paths);
+        return { data: null, error: null };
+      },
+    }),
+  };
 
   from(table: string) {
     return new Query(this, table);
@@ -121,6 +154,11 @@ export class FakeDb {
   }
   auth = {
     admin: {
+      deleteUser: async (id: string) => {
+        delete this.users[id];
+        this.deletedUsers.push(id);
+        return { data: null, error: null };
+      },
       getUserById: async (id: string) =>
         this.users[id]
           ? { data: { user: { id, email: this.users[id].email } }, error: null }

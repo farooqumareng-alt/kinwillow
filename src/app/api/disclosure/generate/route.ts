@@ -24,7 +24,9 @@ export async function POST(req: Request) {
     .eq("id", requestId)
     .single();
   if (!request) return NextResponse.json({ error: "Request not found" }, { status: 404 });
-  const { data: canEdit } = await supabase.rpc("has_edit_grant", { hid: request.household_id });
+  // has_member_edit, not has_edit_grant: release must keep working for a
+  // sealed (lapsed, read-only) household.
+  const { data: canEdit } = await supabase.rpc("has_member_edit", { hid: request.household_id });
   if (!canEdit) return NextResponse.json({ error: "You cannot release this request" }, { status: 403 });
   if (request.state !== "waiting") {
     return NextResponse.json({ error: `This request is ${request.state}` }, { status: 409 });

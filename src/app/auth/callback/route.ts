@@ -13,7 +13,9 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data.session) {
       await markSessionVerified(data.session);
-      return NextResponse.redirect(`${origin}/app`);
+      // Only two destinations are ever allowed — never an arbitrary URL.
+      const next = searchParams.get("next") === "/reset-password" ? "/reset-password" : "/app";
+      return NextResponse.redirect(`${origin}${next}`);
     }
   }
   return NextResponse.redirect(`${origin}/login?error=auth`);

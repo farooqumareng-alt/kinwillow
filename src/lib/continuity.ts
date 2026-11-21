@@ -14,8 +14,8 @@ export type VerifiedState = (typeof VERIFIED_STATES)[number];
 export const STATE_LABELS: Record<VerifiedState, string> = {
   not_started: "Not started",
   in_progress: "In progress",
-  attested: "Attested",
-  evidence_verified: "Verified",
+  attested: "Confirmed by you",
+  evidence_verified: "Confirmed with evidence",
   drift_suspected: "Drift suspected",
   stale: "Stale — re-check due",
   revoked_or_invalid: "Revoked / no longer valid",
@@ -53,13 +53,17 @@ export type ContinuityRecord = {
   created_at: string;
 };
 
-export function healthScore(records: Pick<ContinuityRecord, "verified_state" | "criticality">[]): number | null {
+/** Scored on the effective state, so a record past its re-check date counts as stale. */
+export function healthScore(
+  records: Array<Pick<ContinuityRecord, "verified_state" | "criticality"> & { recheck_due?: string | null }>
+): number | null {
   if (records.length === 0) return null;
   let num = 0;
   let den = 0;
   for (const r of records) {
     const w = CRITICALITY_WEIGHTS[r.criticality] ?? 2;
-    num += w * (STATE_FACTORS[r.verified_state] ?? 0);
+    const state = effectiveState({ verified_state: r.verified_state, recheck_due: r.recheck_due ?? null });
+    num += w * (STATE_FACTORS[state] ?? 0);
     den += w;
   }
   return den === 0 ? null : Math.round((num / den) * 100);

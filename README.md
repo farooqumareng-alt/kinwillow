@@ -22,28 +22,41 @@ npm test            # release, package and scheduled-job tests
 npm run build
 ```
 
-## Deploying the Phase 1 change (emergency release, plan lock, sign-in enforcement)
+## Deploying the Phase 1 + 2 changes
 
-Order matters. Do these in sequence:
+(Emergency release, plan lock, sign-in enforcement, reminders, password reset,
+account deletion, activity log, read-only sealing.) Order matters:
 
-1. **Run `supabase/migrations/20261121000008_phase1_core.sql`** in the Supabase
-   SQL editor. It is additive: new columns, the plan/status guard on
-   `households`, the `verified_sessions` table and `session_state()`.
+1. **Run, in the Supabase SQL editor, in this order:**
+   - `supabase/migrations/20261121000008_phase1_core.sql`
+   - `supabase/migrations/20261121000010_phase2_honesty.sql`
+
+   Both are additive (new columns, guards, the `verified_sessions` table,
+   `session_state()`, the hardened `append_audit`). Do **not** run `…000011` yet.
 2. **Set the new Vercel env vars** (see `.env.example`):
-   - `CRON_SECRET` — any long random string. Without it the scheduled job
-     refuses to run and nothing is ever released automatically.
+   - `CRON_SECRET` — any long random string. Without it the scheduled jobs
+     refuse to run: nothing is auto-released, no reminders go out and no
+     requested account deletion is carried out.
    - `KINWILLOW_MASTER_KEY` — must already be set; released packages are now
      stored encrypted with it.
    - `NEXT_PUBLIC_SITE_URL` — optional, defaults to `https://www.kinwillow.com`.
-3. **Deploy.** `vercel.json` registers a daily job at 14:00 UTC calling
-   `/api/cron/disclosure`. On a Vercel Pro plan, change the schedule to
-   `0 * * * *` (hourly) so releases and reminders land closer to the minute.
-4. **Sign in once on production**, then confirm a row appeared in
+3. **Update the Supabase password-recovery email template**: paste
+   `supabase/templates/recovery.html` into Authentication → Emails → Reset
+   password. It now links to `/auth/confirm?token_hash=…`, which works even
+   when the email is opened on a different device. Without this, "Forgot your
+   password?" sends a link that does not reach the reset page.
+4. **Deploy.** `vercel.json` registers two daily jobs (14:00 and 14:30 UTC):
+   `/api/cron/disclosure` (owner reminders and automatic release) and
+   `/api/cron/reminders` (renewal and re-check reminders, account deletions).
+   On a Vercel Pro plan, change the first schedule to `0 * * * *` (hourly) so
+   releases land closer to the minute.
+5. **Sign in once on production**, then confirm a row appeared in
    `public.verified_sessions`.
-5. **Run `supabase/migrations/20261121000009_phase1_enforce_session.sql`.**
+6. **Run `supabase/migrations/20261121000011_enforce_after_deploy.sql`.**
    From this point a session that skipped the emailed code (or the
-   authenticator app, when one is switched on) can read nothing. Everyone
-   signed in at that moment is asked to sign in again.
+   authenticator app, when one is switched on) can read nothing, and a sealed
+   household is read-only. Everyone signed in at that moment is asked to sign
+   in again.
 
 How emergency release now works: a contact's request emails the owner at once;
 the job sends a midpoint and a final reminder; when the waiting period ends

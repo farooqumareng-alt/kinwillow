@@ -94,8 +94,8 @@ export default function ContinuityCentre() {
       </h1>
       <p className="sans" style={{ color: "var(--muted)", marginBottom: 24, maxWidth: 640 }}>
         For each important account, KinWillow walks you through the provider&rsquo;s own legacy
-        setting, records the evidence, and keeps watch for drift — so your family&rsquo;s plan is
-        verified, not just written down.
+        setting, records that you completed it, and reminds you to re-check it each year — so your
+        family&rsquo;s plan is confirmed and current, not just written down.
       </p>
 
       <div className="grid" style={{ marginBottom: 28 }}>

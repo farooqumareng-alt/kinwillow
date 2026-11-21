@@ -43,7 +43,7 @@ function formatWhen(iso: string): string {
 }
 
 /** The owner's sign-in email, read from the auth record (not the editable profile). */
-async function ownerEmail(service: SupabaseClient, householdId: string): Promise<string | null> {
+export async function ownerEmail(service: SupabaseClient, householdId: string): Promise<string | null> {
   const { data: household, error } = await service
     .from("households")
     .select("owner_id")

@@ -84,10 +84,10 @@ export default async function Dashboard() {
       </p>
 
       {!mfaOn && (
-        <div className="error sans" style={{ marginBottom: 24 }}>
-          Multi-factor authentication is not switched on yet. It&rsquo;s required before you can add
-          trusted contacts or recovery instructions —{" "}
-          <a href="/app/security">set it up now</a>.
+        <div className="notice sans" style={{ marginTop: 0, marginBottom: 24 }}>
+          Your sign-in is protected by your password and an emailed code. For a stronger second
+          step, <a href="/app/security">add an authenticator app</a> — recommended once you have
+          named trusted contacts.
         </div>
       )}
 

@@ -20,14 +20,21 @@ export async function GET() {
   if (!membership) return NextResponse.json({ error: "No household" }, { status: 404 });
   const hid = membership.household_id as string;
 
-  const [household, items, documents, records, contacts, scopes] = await Promise.all([
+  const [household, items, documents, records, contacts, scopes, requests, skips, audit] = await Promise.all([
     supabase.from("households").select("*").eq("id", hid).single(),
     supabase.from("inventory_items").select("*").eq("household_id", hid),
     supabase.from("documents").select("*").eq("household_id", hid),
     supabase.from("continuity_records").select("*").eq("household_id", hid),
     supabase.from("trusted_contacts").select("id, name, email, phone, relationship, status, created_at").eq("household_id", hid),
     supabase.from("release_scopes").select("*").eq("household_id", hid),
+    supabase.from("disclosure_requests").select("*").eq("household_id", hid),
+    supabase.from("wizard_skips").select("prompt_key, created_at").eq("household_id", hid),
+    supabase.from("audit_log").select("*").eq("household_id", hid).order("created_at", { ascending: true }),
   ]);
+  const contactIds = (contacts.data ?? []).map((c: { id: string }) => c.id);
+  const contactScopes = contactIds.length
+    ? await supabase.from("contact_scopes").select("contact_id, scope_id").in("contact_id", contactIds)
+    : { data: [] };
 
   const tryDecrypt = (enc: string | null) => {
     if (!enc) return null;
@@ -63,6 +70,10 @@ export async function GET() {
         continuity_records: recordsOut,
         trusted_contacts: contacts.data,
         release_scopes: scopes.data,
+        contact_scopes: contactScopes.data,
+        emergency_requests: requests.data,
+        skipped_checklist_prompts: skips.data,
+        activity_log: audit.data,
       },
       null,
       2

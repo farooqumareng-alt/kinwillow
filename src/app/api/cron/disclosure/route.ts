@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/service";
+import { cronAuthorized } from "@/lib/cron";
 import {
   FINAL_REMINDER_HOURS,
   MIN_VETO_HOURS,
@@ -21,20 +21,12 @@ export const maxDuration = 60;
 // and it retries any "your package is ready" email that failed to send.
 //
 // Vercel calls this with "Authorization: Bearer $CRON_SECRET".
-function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const given = Buffer.from(req.headers.get("authorization") ?? "");
-  const expected = Buffer.from(`Bearer ${secret}`);
-  return given.length === expected.length && timingSafeEqual(given, expected);
-}
-
 export async function GET(req: Request) {
   if (!process.env.CRON_SECRET) {
     console.error("[cron] CRON_SECRET is not set; the disclosure job cannot run");
     return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 501 });
   }
-  if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let service;
   try {

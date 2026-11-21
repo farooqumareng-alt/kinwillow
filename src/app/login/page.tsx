@@ -37,6 +37,9 @@ export default function LoginPage() {
     if (params.get("created") === "1") {
       setInfo("Your vault is created. Sign in to open it — we'll email you a 6-digit code.");
     }
+    if (params.get("idle") === "1") {
+      setInfo("You were signed out after 30 minutes without activity, to keep your vault safe.");
+    }
     if (params.get("error") === "auth") {
       setError("That link didn't work or has expired. Please sign in below.");
     }
@@ -213,6 +216,9 @@ export default function LoginPage() {
         {error && <div className="error" role="alert">{error}</div>}
         <button className="btn" type="submit" disabled={busy}>{busy ? "Sending code…" : "Continue"}</button>
         <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 16, textAlign: "center" }}>
+          <a href="/forgot-password">Forgot your password?</a>
+        </p>
+        <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 8, textAlign: "center" }}>
           New to KinWillow? <a href="/signup">Create your vault</a>
         </p>
       </form>
