@@ -1,0 +1,42 @@
+{
+  "packageId": "com.kinwillow.app",
+  "host": "www.kinwillow.com",
+  "name": "KinWillow",
+  "launcherName": "KinWillow",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#2E5A3D",
+  "themeColorDark": "#1F4030",
+  "navigationColor": "#FAF7F0",
+  "navigationColorDark": "#1F4030",
+  "navigationDividerColor": "#E4DDD0",
+  "navigationDividerColorDark": "#1F4030",
+  "backgroundColor": "#FAF7F0",
+  "enableNotifications": false,
+  "startUrl": "/app?source=twa",
+  "iconUrl": "https://www.kinwillow.com/icon-512.png",
+  "maskableIconUrl": "https://www.kinwillow.com/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./upload.p12",
+    "alias": "upload"
+  },
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://www.kinwillow.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://www.kinwillow.com/",
+  "minSdkVersion": 21,
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}
