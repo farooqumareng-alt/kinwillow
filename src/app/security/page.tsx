@@ -51,6 +51,12 @@ export default function SecurityPage() {
           and the emergency process keeps working. Deletion happens only at your explicit request
           from Settings, after a 30-day grace period in which you can change your mind.
         </p>
+        <h3 style={{ color: "var(--green-dark)" }}>If KinWillow itself ever closes</h3>
+        <p>
+          You and your trusted contacts get at least 90 days&rsquo; notice, and your export and
+          printable binder stay available throughout. The full commitments are in our{" "}
+          <a href="/pledge">Continuity Pledge</a>.
+        </p>
         <h3 style={{ color: "var(--green-dark)" }}>What we don&rsquo;t do</h3>
         <p>
           No advertising trackers in the vault. No sale of personal data. No custody of your

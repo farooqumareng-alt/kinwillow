@@ -16,6 +16,10 @@ const LABELS: Record<string, string> = {
   "household.exported": "The vault was exported",
   "household.printed": "The printable binder was opened",
   "household.created": "This vault was created",
+  "helper.invited": "A helper was invited",
+  "helper.joined": "A helper accepted an invitation and now has access",
+  "helper.removed": "A helper was removed",
+  "helper.left": "A helper stopped helping",
   "continuity.recovery_path_revealed": "Recovery instructions were viewed",
   "continuity.key_location_revealed": "An access-key location was viewed",
 };
@@ -85,7 +89,7 @@ export default function ActivityPage() {
                 <div>{describe(e.action)}</div>
                 <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
                   {new Date(e.created_at).toLocaleString()} ·{" "}
-                  {e.actor ? (e.actor === me ? "You" : "Another household member") : "KinWillow (automatic) or a trusted contact"}
+                  {e.actor ? (e.actor === me ? "You" : "Someone else with access to this vault") : "KinWillow (automatic) or a trusted contact"}
                 </div>
               </li>
             ))}

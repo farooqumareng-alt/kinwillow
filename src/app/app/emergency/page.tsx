@@ -138,7 +138,8 @@ export default function EmergencyPage() {
           Days before a package is released (2–30)
           <input type="number" min={2} max={30} value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ width: 110 }} />
         </label>
-        <button className="btn" style={{ marginTop: 10 }} onClick={saveWaiting}>Save waiting period</button>
+        <button className="btn" style={{ marginTop: 10 }} onClick={saveWaiting} disabled={household?.role !== "owner"}>Save waiting period</button>
+        {household?.role !== "owner" && <p className="muted" style={{ fontSize: 14, marginTop: 8 }}>Only the owner can change this.</p>}
       </div>
 
       <h2 style={{ fontSize: 22, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 10 }}>
@@ -161,7 +162,10 @@ export default function EmergencyPage() {
                   {new Date(r.release_at).toLocaleString()}
                 </div>
                 {r.reason && <p style={{ marginTop: 6 }}>{r.reason}</p>}
-                {r.state === "waiting" && (
+                {r.state === "waiting" && household?.role !== "owner" && (
+                  <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>Only the vault&rsquo;s owner can veto or release this request.</p>
+                )}
+                {r.state === "waiting" && household?.role === "owner" && (
                   <div className="row" style={{ marginTop: 10 }}>
                     <button className="btn danger" onClick={() => veto(r)}>Veto — stop this request</button>
                     <button className="btn secondary" onClick={() => generate(r)} disabled={!due}>

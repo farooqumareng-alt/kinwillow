@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
@@ -9,6 +9,19 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [partner, setPartner] = useState("");
+
+  // A partner's referral link is /signup?partner=CODE. Remember the code for
+  // this browser so it survives a visit to the pricing page first.
+  useEffect(() => {
+    const fromLink = new URLSearchParams(window.location.search).get("partner");
+    try {
+      if (fromLink) localStorage.setItem("kw-partner", fromLink.slice(0, 32));
+      setPartner(localStorage.getItem("kw-partner") ?? "");
+    } catch {
+      setPartner(fromLink ?? "");
+    }
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,7 +32,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { display_name: name },
+        data: { display_name: name, ...(partner ? { partner_code: partner } : {}) },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
@@ -46,6 +59,11 @@ export default function SignupPage() {
       <p className="lede" style={{ marginBottom: 10 }}>
         Free to start: 25 items and 1 trusted contact. No card required.
       </p>
+      {partner && (
+        <p className="sans" style={{ textAlign: "center", fontSize: 14, color: "var(--green-dark)", marginBottom: 10 }}>
+          You were referred by a KinWillow partner (code {partner.toUpperCase()}).
+        </p>
+      )}
       <form className="card sans" onSubmit={submit}>
         <label htmlFor="name">Your name</label>
         <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />

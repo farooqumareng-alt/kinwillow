@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/app/inventory", label: "Your vault" },
   { href: "/app/continuity", label: "Continuity Centre" },
   { href: "/app/contacts", label: "Contacts & scopes" },
+  { href: "/app/helpers", label: "Helpers" },
   { href: "/app/emergency", label: "Emergency" },
   { href: "/app/review", label: "Annual review" },
   { href: "/app/activity", label: "Activity log" },

@@ -30,7 +30,9 @@ export default async function Dashboard() {
   // otherwise their own.
   const rows = (memberships ?? []) as unknown as MembershipRow[];
   const preferred = (await cookies()).get(HOUSEHOLD_COOKIE)?.value;
-  const household = pickHousehold(rows, preferred)?.households ?? undefined;
+  const membership = pickHousehold(rows, preferred);
+  const household = membership?.households ?? undefined;
+  const helping = Boolean(membership && membership.role !== "owner");
   const hid = household?.id;
 
   const { data: factors } = await supabase.auth.mfa.listFactors();
@@ -135,7 +137,7 @@ export default async function Dashboard() {
     <main>
       <h1 style={{ marginBottom: 6 }}>{household ? household.name : "Your vault"}</h1>
       <p className="sans muted" style={{ marginBottom: 24 }}>
-        {household?.kind === "parents" ? "Your parents’ vault · " : ""}
+        {helping ? "You are helping with this vault · " : household?.kind === "parents" ? "Your parents’ vault · " : ""}
         Plan: {PLAN_NAMES[household?.plan_tier ?? "free"] ?? household?.plan_tier}
         {household?.status === "sealed" ? " · Sealed (read-only)" : ""} · Emergency waiting period:{" "}
         {household ? Math.round(household.waiting_period_hours / 24) : 7} days

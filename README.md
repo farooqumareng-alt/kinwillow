@@ -42,6 +42,12 @@ Run both in the Supabase SQL editor; neither depends on deploy order:
 - `supabase/migrations/20261121000015_annual_review.sql` — adds the
   "last confirmed" date behind the Annual review page and its reminder email.
   Until it is run that page says it is not available yet.
+- `supabase/migrations/20261121000016_helpers_and_partners.sql` — helpers
+  (people an owner invites into their vault) and the partner programme. Run it
+  **before** deploying the matching code. To make someone a partner, use
+  "Make partner" on their row in Admin → Users & households; to give partner
+  clients a discount, create a coupon in Stripe and put its id in
+  `STRIPE_PARTNER_COUPON`.
 - `supabase/migrations/20261121000014_rate_limits.sql` — the rate limiter for
   the public forms and sign-in. Until it is run the app logs
   `is not being limited` and lets requests through.
