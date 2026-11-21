@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#2e5a3d" />
+    <title>You're offline — KinWillow</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+             background: #faf7f0; color: #1c2420; font-family: Georgia, 'Times New Roman', serif; line-height: 1.6; }
+      main { max-width: 460px; padding: 32px 24px; text-align: center; }
+      img { width: 72px; height: auto; }
+      h1 { font-size: 28px; font-weight: normal; color: #1f4030; margin: 18px 0 10px; }
+      p { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #5c6a61; font-size: 16px; }
+      button { margin-top: 22px; padding: 14px 28px; border: none; border-radius: 8px; background: #2e5a3d; color: #fff;
+               font-size: 16px; cursor: pointer; font-family: inherit; }
+      button:focus-visible { outline: 3px solid #7fa58a; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/logo-symbol.png" alt="" />
+      <h1>You're offline</h1>
+      <p>
+        KinWillow needs a connection to open your vault. For your safety, nothing from your vault is
+        kept on this device. Your vault itself is unaffected.
+      </p>
+      <p>If you need your information without a connection, use the printed binder from Settings.</p>
+      <button onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>
