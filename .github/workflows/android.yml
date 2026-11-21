@@ -121,7 +121,8 @@ jobs:
           for f in build.log generate.log; do
             [ -f "$f" ] || continue
             # Strip colour codes; keep the last lines; never echo secrets (none are printed by the build).
-            tail_text=$(sed -e 's/\x1b\[[0-9;]*[A-Za-z]//g' "$f" | grep -v '^[[:space:]]*$' | tail -n 45 | cut -c1-300)
+            # Drop Java stack frames ("at org.…") so the lines that state the cause survive.
+            tail_text=$(sed -e 's/\x1b\[[0-9;]*[A-Za-z]//g' "$f" | grep -v '^[[:space:]]*$' | grep -v -E '^[[:space:]]+(at |\.\.\. [0-9]+ more)' | tail -n 60 | cut -c1-400)
             encoded=$(printf '%s' "$tail_text" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN{ORS="%0A"}{print}')
             echo "::error title=End of $f::${encoded:0:6000}"
           done
