@@ -26,10 +26,13 @@ export default function Home() {
           anywhere your family could find.
         </p>
         <div className="stats">
-          <div className="stat"><span className="num">168</span><p>online accounts for the average person — bank, email, photos, bills, everything</p></div>
+          <div className="stat"><span className="num">48%</span><p>of US adults have left no instructions of any kind for their digital accounts</p></div>
           <div className="stat"><span className="num">1 in 4</span><p>adults has a will — and even a will doesn&rsquo;t say where the accounts are or how to get in</p></div>
           <div className="stat"><span className="num">Months</span><p>families spend hunting through phones, inboxes, and paperwork that a one-hour setup would have prevented</p></div>
         </div>
+        <p className="sans" style={{ fontSize: 13, color: "var(--muted)", marginTop: 14, textAlign: "center" }}>
+          Sources: Trust &amp; Will Estate Planning Report, 2026; Caring.com Wills and Estate Planning Survey, 2025.
+        </p>
       </section>
 
       <section id="how">
@@ -37,7 +40,7 @@ export default function Home() {
         <p className="lede">Three steps, about an hour, at your pace.</p>
         <div className="steps">
           <div className="step"><span className="n sans">1</span><h3>Build your vault</h3><p>A guided checklist walks you through accounts, subscriptions, documents, and devices — where each thing is, how billing works, and where password recovery lives. Never the passwords themselves.</p></div>
-          <div className="step"><span className="n sans">2</span><h3>Name your people</h3><p>Choose trusted contacts and set exactly what each person can see, and when. In an emergency, they can request access — you&rsquo;re notified, and nothing is released instantly.</p></div>
+          <div className="step"><span className="n sans">2</span><h3>Name your people</h3><p>Choose trusted contacts and set exactly what each person can see, and when. In an emergency, they can request access — you&rsquo;re notified and can stop it, and nothing is released until the waiting period you chose has passed.</p></div>
           <div className="step"><span className="n sans">3</span><h3>Stay current automatically</h3><p>Renewal and expiry reminders keep the vault from going stale, and built-in guides walk you through switching on Apple, Google, and Meta legacy settings.</p></div>
         </div>
       </section>

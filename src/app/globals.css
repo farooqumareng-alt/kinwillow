@@ -89,3 +89,91 @@ footer.site{text-align:center;padding:34px 5% 44px;color:var(--muted);font-size:
 .panel p{color:var(--muted);font-size:15px}
 .score{font-size:44px;color:var(--green)}
 @media (max-width:640px){.hero h1{font-size:33px}.hero{padding-top:44px}}
+
+/* ---------- Phase 3: shared components and responsive fixes ---------- */
+
+/* Keyboard focus is always visible. */
+:focus-visible{outline:3px solid #7fa58a;outline-offset:2px;border-radius:4px}
+
+/* Every text-like field shares one look (not just email/password/text). */
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]),textarea,select{
+  padding:12px 14px;border-radius:8px;border:1px solid #c9c2b2;font-size:16px;background:#fff;color:var(--ink);
+  font-family:inherit;max-width:100%}
+textarea{line-height:1.5}
+input[type=email]{min-width:0}
+form.inline input[type=email]{min-width:min(280px,100%)}
+input[type=checkbox],input[type=radio]{width:18px;height:18px;accent-color:var(--green);flex:none}
+::placeholder{color:#7b857e;opacity:1}
+
+/* Labels inside panels stack above their field. */
+.panel label,.field{display:block;font-size:14px;color:#38443c}
+.panel label>input:not([type=checkbox]):not([type=radio]),.panel label>select,.panel label>textarea{display:block;width:100%;margin-top:6px}
+.panel label:has(>input[type=checkbox]),.panel label:has(>input[type=radio]){display:flex;gap:8px;align-items:center}
+
+/* Buttons */
+.btn{line-height:1.3;font-family:inherit}
+.btn:disabled,.btn[aria-disabled=true]{opacity:.55;cursor:not-allowed}
+.btn:disabled:hover{background:var(--green)}
+.btn.secondary,.btn-secondary{background:transparent;color:var(--green-dark);border:1.5px solid var(--green)}
+.btn.secondary:hover,.btn-secondary:hover{background:#eef4ee}
+.btn.secondary:disabled:hover,.btn-secondary:disabled:hover{background:transparent}
+.btn.is-active{background:var(--green);color:#fff}
+.btn.danger{background:#7c2d20;color:#fff;border:none}
+.btn.danger:hover{background:#63231a}
+.btn.danger-outline{background:transparent;color:#7c2d20;border:1.5px solid #7c2d20}
+.btn.danger-outline:hover{background:#f9e9e7}
+.btn.small{padding:9px 16px;font-size:14.5px}
+.link-btn{background:none;border:none;padding:0;color:var(--green);cursor:pointer;font-size:inherit;font-family:inherit;text-decoration:underline}
+.link-btn.muted{color:var(--muted)}
+.link-btn.danger{color:#7c2d20}
+
+/* Status chips */
+.chip{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12.5px;line-height:1.6;background:#eeeae0;color:#4b4a40;border:1px solid #ddd6c6;white-space:nowrap}
+.chip.good{background:#e6f1e7;color:#1f4030;border-color:#c5dcc8}
+.chip.warn{background:#fbf1dc;color:#6b4d0e;border-color:#ecd9a8}
+.chip.bad{background:#f9e9e7;color:#7c2d20;border-color:#e3b7b0}
+
+/* Narrow reading column (security, package, request-access). */
+.narrow{max-width:760px;margin:0 auto;padding:40px 5% 70px}
+.narrow h3{margin-top:10px}
+
+/* Long tokens and links must wrap instead of widening the page. */
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;background:#f3efe6;padding:2px 6px;border-radius:4px;overflow-wrap:anywhere;word-break:break-word}
+
+/* Vault pages */
+.app-content h1{font-size:32px;color:var(--green-dark);font-weight:normal;line-height:1.2}
+.app-content h2{text-align:left}
+.app-nav--sidebar a[aria-current=page]{font-weight:bold;color:var(--green);text-decoration:none}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted)}
+.steps-list{list-style:none;display:grid;gap:10px}
+.steps-list li{display:flex;gap:12px;align-items:flex-start}
+.steps-list .mark{flex:none;width:26px;height:26px;border-radius:50%;border:2px solid #b9c7bc;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
+.steps-list .done .mark{background:var(--green);border-color:var(--green)}
+.steps-list .done .label{color:var(--muted);text-decoration:line-through}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Calm header for pages a grieving person may open (no marketing links). */
+header.site.calm{justify-content:center;padding-bottom:6px}
+footer.site.calm{border-top:none;padding-top:10px}
+
+/* Header wraps instead of overflowing on phones. */
+header.site{flex-wrap:wrap;gap:10px 20px}
+nav.site{display:flex;flex-wrap:wrap;align-items:center;gap:8px 22px}
+nav.site a{margin-left:0}
+nav.site span{margin-left:0 !important}
+@media (max-width:640px){
+  header.site{padding:14px 5%}
+  .logo{font-size:22px}
+  .logo img{height:38px !important}
+  nav.site{font-size:14px;gap:6px 16px}
+  nav.site .optional{display:none}
+  section{padding:44px 5%}
+  h2{font-size:26px}
+  .panel{padding:20px}
+  .card{padding:22px}
+  .app-content h1{font-size:27px}
+  .btn{padding:13px 22px}
+  .signup-block{padding:36px 6%}
+}
+@media (prefers-reduced-motion:no-preference){.btn,.link-btn{transition:background-color .12s ease}}

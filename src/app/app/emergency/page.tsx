@@ -15,6 +15,14 @@ type Request = {
 };
 type Contact = { id: string; name: string };
 
+const STATE_NAMES: Record<string, string> = {
+  waiting: "Waiting period running",
+  vetoed: "Vetoed by you",
+  released: "Released",
+  expired: "Expired",
+  completed: "Completed",
+};
+
 export default function EmergencyPage() {
   const [household, setHousehold] = useState<HouseholdInfo | null>(null);
   const [requests, setRequests] = useState<Request[]>([]);
@@ -65,10 +73,23 @@ export default function EmergencyPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    await supabase
+    setMsg(null);
+    const { data: vetoed, error } = await supabase
       .from("disclosure_requests")
       .update({ state: "vetoed", vetoed_by: user?.id, vetoed_at: new Date().toISOString() })
-      .eq("id", r.id);
+      .eq("id", r.id)
+      .eq("state", "waiting")
+      .select("id");
+    if (error || !vetoed || vetoed.length === 0) {
+      setMsg(
+        error
+          ? `The veto did not go through: ${error.message}`
+          : "The veto did not go through — this request is no longer waiting. Refresh to see its current state."
+      );
+      if (household) await load(household.id);
+      return;
+    }
+    setMsg("Request vetoed. Nothing will be released.");
     await supabase.rpc("append_audit", {
       p_household: household?.id,
       p_actor: user?.id,
@@ -105,16 +126,17 @@ export default function EmergencyPage() {
       </h1>
       <p className="sans" style={{ color: "var(--muted)", marginBottom: 24, maxWidth: 640 }}>
         When a trusted contact requests your recovery information, a waiting period starts. You are
-        notified and can veto at any time. Only when the wait passes without a veto can the
-        recovery package be generated — and what it contains is controlled by each account&rsquo;s
-        verified state.
+        emailed straight away and reminded before the wait ends, and you can veto at any time. If
+        the wait passes without a veto, the recovery package is released to that contact
+        automatically — your vault items and documents, plus each account&rsquo;s legacy-setting
+        instructions, limited to the scopes you gave them.
       </p>
 
       <div className="panel sans" style={{ marginBottom: 24, maxWidth: 560 }}>
         <h3>Waiting period</h3>
-        <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          Days before a release can happen (2–30)
-          <input type="number" min={2} max={30} value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ width: 80 }} />
+        <label>
+          Days before a package is released (2–30)
+          <input type="number" min={2} max={30} value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ width: 110 }} />
         </label>
         <button className="btn" style={{ marginTop: 10 }} onClick={saveWaiting}>Save waiting period</button>
       </div>
@@ -130,24 +152,26 @@ export default function EmergencyPage() {
             const due = new Date(r.release_at).getTime() <= Date.now();
             return (
               <div key={r.id} className="panel sans">
-                <strong>{contactName(r.trusted_contact_id)}</strong> · {r.request_class} ·{" "}
-                <span className="chip">{r.state}</span>
+                <strong>{contactName(r.trusted_contact_id)}</strong> · {r.request_class === "death" ? "reported a death" : "reported incapacity"} ·{" "}
+                <span className={`chip ${r.state === "waiting" ? "warn" : r.state === "released" ? "good" : r.state === "vetoed" ? "bad" : ""}`}>
+                  {STATE_NAMES[r.state] ?? r.state}
+                </span>
                 <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
-                  Requested {new Date(r.requested_at).toLocaleString()} · Release possible after{" "}
+                  Requested {new Date(r.requested_at).toLocaleString()} · {r.state === "waiting" ? "Releases automatically after" : "Waiting period ended"}{" "}
                   {new Date(r.release_at).toLocaleString()}
                 </div>
                 {r.reason && <p style={{ marginTop: 6 }}>{r.reason}</p>}
                 {r.state === "waiting" && (
-                  <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                    <button className="btn secondary" onClick={() => veto(r)}>Veto this request</button>
-                    <button className="btn" onClick={() => generate(r)} disabled={!due}>
-                      {due ? "Generate recovery package" : "Waiting period not over"}
+                  <div className="row" style={{ marginTop: 10 }}>
+                    <button className="btn danger" onClick={() => veto(r)}>Veto — stop this request</button>
+                    <button className="btn secondary" onClick={() => generate(r)} disabled={!due}>
+                      {due ? "Release the package now" : "Waiting period not over"}
                     </button>
                   </div>
                 )}
                 {packageLinks[r.id] && (
                   <p style={{ marginTop: 10 }}>
-                    Package link (valid 7 days, share it with the contact): <code>{packageLinks[r.id]}</code>
+                    Released. The contact has been emailed this link (valid 30 days): <code>{packageLinks[r.id]}</code>
                   </p>
                 )}
               </div>
@@ -155,7 +179,7 @@ export default function EmergencyPage() {
           })}
         </div>
       )}
-      {msg && <p className="sans" style={{ marginTop: 16 }}>{msg}</p>}
+      {msg && <p className="sans" role="status" style={{ marginTop: 16 }}>{msg}</p>}
     </main>
   );
 }

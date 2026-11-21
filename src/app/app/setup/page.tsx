@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getMyHousehold } from "@/lib/household";
 import { SECTIONS, ESSENTIAL_SLOTS, ACCOUNT_TYPES, COMMON_INSTITUTIONS } from "@/lib/sections";
+import { friendlyError, isPlanLimit } from "@/lib/errors";
 
 interface Draft {
   entry?: string;
@@ -22,6 +23,8 @@ export default function SetupWizardPage() {
   const [open, setOpen] = useState(1);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [error, setError] = useState("");
+  const [upgrade, setUpgrade] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [busyKey, setBusyKey] = useState("");
 
   async function load() {
@@ -47,6 +50,7 @@ export default function SetupWizardPage() {
     setLocations(locs.slice(0, 8));
     const { data: sk } = await supabase.from("wizard_skips").select("prompt_key").eq("household_id", h.id);
     setSkips(new Set((sk ?? []).map((r: { prompt_key: string }) => r.prompt_key)));
+    setLoaded(true);
   }
   useEffect(() => {
     load();
@@ -60,10 +64,12 @@ export default function SetupWizardPage() {
     if (!householdId) return false;
     setBusyKey(key);
     setError("");
+    setUpgrade(false);
     const supabase = createClient();
     const { error } = await supabase.from("inventory_items").insert({ household_id: householdId, ...payload });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error.message));
+      setUpgrade(isPlanLimit(error.message));
       setBusyKey("");
       return false;
     }
@@ -115,7 +121,8 @@ export default function SetupWizardPage() {
   async function skip(promptKey: string) {
     if (!householdId) return;
     const supabase = createClient();
-    await supabase.from("wizard_skips").insert({ household_id: householdId, prompt_key: promptKey });
+    const { error } = await supabase.from("wizard_skips").insert({ household_id: householdId, prompt_key: promptKey });
+    if (error) setError(friendlyError(error.message));
     await load();
   }
   async function unskip(promptKey: string) {
@@ -125,12 +132,13 @@ export default function SetupWizardPage() {
     await load();
   }
 
-  const locationField = (key: string, placeholder = "Where is it stored?") => (
+  const locationField = (key: string, what: string, placeholder = "Where is it stored?") => (
     <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, flex: "1 1 220px" }}>
       <input
         type="text"
         list="kw-locations"
         placeholder={placeholder}
+        aria-label={`${what}: where is it stored?`}
         value={drafts[key]?.location ?? ""}
         onChange={(e) => setDraft(key, { location: e.target.value })}
         style={{ width: "100%" }}
@@ -142,7 +150,8 @@ export default function SetupWizardPage() {
               key={l}
               type="button"
               onClick={() => setDraft(key, { location: l })}
-              style={{ fontSize: 12, padding: "3px 10px", borderRadius: 20, border: "1px solid var(--line)", background: "#faf7f0", cursor: "pointer" }}
+              aria-label={`Use location: ${l}`}
+              style={{ fontSize: 13, padding: "5px 12px", borderRadius: 20, border: "1px solid var(--line)", background: "#faf7f0", cursor: "pointer" }}
             >
               {l}
             </button>
@@ -158,7 +167,7 @@ export default function SetupWizardPage() {
       onClick={() => skip(promptKey)}
       style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 13, textDecoration: "underline", whiteSpace: "nowrap" }}
     >
-      Don&rsquo;t have one
+      Skip — doesn&rsquo;t apply
     </button>
   );
 
@@ -184,10 +193,9 @@ export default function SetupWizardPage() {
         Write where things live and how recovery works; <strong>never write a password</strong>.
       </p>
       <p className="sans" style={{ marginBottom: 24 }}>
-        Progress: <strong>{doneSections} of 10 sections started</strong>
+        Progress: <strong>{loaded ? `${doneSections} of 10 sections started` : "loading…"}</strong>
         {doneSections === 10 ? " — vault built. You can refine everything in Your vault." : ""}
       </p>
-      {error && <div className="error sans" style={{ marginBottom: 16 }}>{error}</div>}
 
       <div style={{ display: "grid", gap: 14 }}>
         {SECTIONS.map((s) => {
@@ -195,20 +203,30 @@ export default function SetupWizardPage() {
           const count = counts[s.n] ?? 0;
           return (
             <div key={s.n} className="panel">
-              <button
-                onClick={() => setOpen(isOpen ? 0 : s.n)}
-                className="sans"
-                style={{ background: "none", border: "none", width: "100%", textAlign: "left", cursor: "pointer", padding: 0 }}
-              >
-                <h3 style={{ fontSize: 19 }}>
-                  {count > 0 ? "✓ " : ""}Section {s.n}: {s.title}
-                  <span style={{ float: "right", color: "var(--muted)", fontSize: 14 }}>
-                    {count > 0 ? `${count} item${count === 1 ? "" : "s"} · ` : ""}{isOpen ? "▾" : "▸"}
+              <h3 style={{ fontSize: 19, marginBottom: 0 }}>
+                <button
+                  onClick={() => setOpen(isOpen ? 0 : s.n)}
+                  aria-expanded={isOpen}
+                  aria-controls={`setup-section-${s.n}`}
+                  style={{ background: "none", border: "none", width: "100%", textAlign: "left", cursor: "pointer", padding: 0, font: "inherit", color: "inherit", display: "flex", justifyContent: "space-between", gap: 12 }}
+                >
+                  <span>
+                    {count > 0 && <span aria-hidden="true">✓ </span>}
+                    Section {s.n}: {s.title}
                   </span>
-                </h3>
-              </button>
+                  <span className="sans" style={{ color: "var(--muted)", fontSize: 14, fontWeight: "normal", whiteSpace: "nowrap" }}>
+                    {count > 0 ? `${count} item${count === 1 ? "" : "s"} added · ` : ""}
+                    <span aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+                  </span>
+                </button>
+              </h3>
+              {isOpen && error && (
+                <div className="error sans" role="alert">
+                  {error} {upgrade && <Link href="/app/billing">See plans</Link>}
+                </div>
+              )}
               {isOpen && s.n === 3 && (
-                <div className="sans" style={{ marginTop: 12 }}>
+                <div className="sans" id={`setup-section-${s.n}`} style={{ marginTop: 12 }}>
                   <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 12 }}>
                     The essentials, ready-made. For each one: say where the original lives (type it once —
                     it becomes a one-tap button everywhere), or tap &ldquo;Don&rsquo;t have one.&rdquo; You
@@ -244,7 +262,7 @@ export default function SetupWizardPage() {
                             <br />
                             <span style={{ color: "var(--muted)", fontSize: 13 }}>{slot.hint}</span>
                           </span>
-                          {locationField(key)}
+                          {locationField(key, slot.title)}
                           <button className="btn" style={{ padding: "10px 18px" }} disabled={busyKey === key} onClick={() => addSlot(slot.key, slot.title, slot.hint)}>
                             {busyKey === key ? "Adding…" : "Add"}
                           </button>
@@ -256,7 +274,7 @@ export default function SetupWizardPage() {
                 </div>
               )}
               {isOpen && s.n !== 3 && (
-                <div className="sans" style={{ marginTop: 12 }}>
+                <div className="sans" id={`setup-section-${s.n}`} style={{ marginTop: 12 }}>
                   {s.intro && <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 12 }}>{s.intro}</p>}
                   <div style={{ display: "grid", gap: 12 }}>
                     {s.prompts.map((prompt) => {
@@ -274,14 +292,14 @@ export default function SetupWizardPage() {
                         return (
                           <div key={key} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
                             <span style={{ flex: "1 1 220px", fontSize: 14, color: "#38443c" }}>{prompt}</span>
-                            <input type="text" list="kw-institutions" placeholder="Institution (start typing…)" value={d.institution ?? ""} onChange={(e) => setDraft(key, { institution: e.target.value })} style={{ flex: "1 1 160px" }} />
-                            <select value={d.type ?? ""} onChange={(e) => setDraft(key, { type: e.target.value })} style={{ flex: "0 1 150px" }}>
+                            <input type="text" list="kw-institutions" placeholder="Institution (start typing…)" aria-label={`${prompt}: institution`} value={d.institution ?? ""} onChange={(e) => setDraft(key, { institution: e.target.value })} style={{ flex: "1 1 160px" }} />
+                            <select aria-label={`${prompt}: account type`} value={d.type ?? ""} onChange={(e) => setDraft(key, { type: e.target.value })} style={{ flex: "0 1 150px" }}>
                               <option value="">Account type…</option>
                               {ACCOUNT_TYPES.map((t) => (
                                 <option key={t} value={t}>{t}</option>
                               ))}
                             </select>
-                            <input type="text" inputMode="numeric" maxLength={4} placeholder="Last 4" value={d.last4 ?? ""} onChange={(e) => setDraft(key, { last4: e.target.value.replace(/\D/g, "") })} style={{ flex: "0 1 80px" }} />
+                            <input type="text" inputMode="numeric" maxLength={4} placeholder="Last 4" aria-label={`${prompt}: last 4 digits`} value={d.last4 ?? ""} onChange={(e) => setDraft(key, { last4: e.target.value.replace(/\D/g, "") })} style={{ flex: "0 1 80px" }} />
                             <button className="btn" style={{ padding: "10px 18px" }} disabled={busyKey === key || !(d.institution ?? "").trim()} onClick={() => quickAdd(s.n, prompt, s.category)}>
                               {busyKey === key ? "Adding…" : "Add"}
                             </button>
@@ -295,11 +313,12 @@ export default function SetupWizardPage() {
                           <input
                             type="text"
                             placeholder="Your entry (e.g. a name, place, or provider)"
+                            aria-label={`${prompt}: your entry`}
                             value={drafts[key]?.entry ?? ""}
                             onChange={(e) => setDraft(key, { entry: e.target.value })}
                             style={{ flex: "1 1 220px" }}
                           />
-                          {locationField(key, "Where is it stored? (optional)")}
+                          {locationField(key, prompt, "Where is it stored? (optional)")}
                           <button className="btn" style={{ padding: "10px 18px" }} disabled={busyKey === key} onClick={() => quickAdd(s.n, prompt, s.category)}>
                             {busyKey === key ? "Adding…" : "Add"}
                           </button>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { hashLoginCode, hashEquals } from "@/lib/login-code";
+import { markSessionVerified } from "@/lib/session";
 
 // Login step 2: verify the 6-digit code, then — and only then — establish
 // the real session. Errors are deliberately generic: the response never
@@ -53,11 +54,17 @@ export async function POST(req: Request) {
     // Code verified — now establish the real session. signInWithPassword
     // re-checks the password, so a code alone can never open an account.
     const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
-    if (error) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
+    if (error || !data.session) {
       return NextResponse.json({ ok: false, error: "Email or password is incorrect." }, { status: 401 });
     }
-    return NextResponse.json({ ok: true });
+    // Only a session recorded here can read vault data (enforced by RLS).
+    await markSessionVerified(data.session);
+
+    // If an authenticator app is switched on, the sign-in is not finished yet.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const mfaRequired = aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2";
+    return NextResponse.json({ ok: true, mfa_required: mfaRequired });
   } catch {
     return NextResponse.json({ ok: false, error: "Something went wrong." }, { status: 500 });
   }

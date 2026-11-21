@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { InventoryItem } from "@/lib/household";
 import { CATEGORY_LABELS, ACCOUNT_TYPES, COMMON_INSTITUTIONS, type Category } from "@/lib/sections";
+import { friendlyError } from "@/lib/errors";
 
 interface Doc {
   id: string;
@@ -27,14 +28,21 @@ export default function ItemDetailPage() {
   const params = useParams<{ id: string }>();
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [scopes, setScopes] = useState<Array<{ id: string; name: string }>>([]);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState(false);
+  const [confirmDoc, setConfirmDoc] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const supabase = createClient();
     const { data } = await supabase.from("inventory_items").select("*").eq("id", params.id).single();
+    if (!data) {
+      setMissing(true);
+      return;
+    }
     setItem(data as InventoryItem);
     const { data: d } = await supabase
       .from("documents")
@@ -42,6 +50,14 @@ export default function ItemDetailPage() {
       .eq("item_id", params.id)
       .order("created_at", { ascending: false });
     setDocs((d ?? []) as Doc[]);
+    if (data) {
+      const { data: sc } = await supabase
+        .from("release_scopes")
+        .select("id, name")
+        .eq("household_id", (data as InventoryItem).household_id)
+        .order("created_at");
+      setScopes((sc ?? []) as Array<{ id: string; name: string }>);
+    }
   }
   useEffect(() => {
     load();
@@ -50,12 +66,16 @@ export default function ItemDetailPage() {
 
   async function save(field: string, value: string | null) {
     if (!item) return;
+    // Leaving a field without changing it is not a save.
+    if (((item as unknown as Record<string, unknown>)[field] ?? null) === value) return;
+    setError("");
+    setMsg("");
     const supabase = createClient();
     const { error } = await supabase
       .from("inventory_items")
       .update({ [field]: value, updated_at: new Date().toISOString() })
       .eq("id", item.id);
-    if (error) setError(error.message);
+    if (error) setError(friendlyError(error.message));
     else {
       setMsg("Saved.");
       await load();
@@ -75,7 +95,7 @@ export default function ItemDetailPage() {
       const safeName = file.name.replace(/[^\w.\-]+/g, "_");
       const path = `${item.household_id}/${docId}-${safeName}`;
       const up = await supabase.storage.from("documents").upload(path, file, { upsert: false });
-      if (up.error) throw new Error(up.error.message);
+      if (up.error) throw new Error(friendlyError(up.error.message));
       const { error } = await supabase.from("documents").insert({
         id: docId,
         household_id: item.household_id,
@@ -86,7 +106,11 @@ export default function ItemDetailPage() {
         size_bytes: file.size,
         sha256: hash,
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Do not leave a stored file that the vault has no record of.
+        await supabase.storage.from("documents").remove([path]);
+        throw new Error(friendlyError(error.message));
+      }
       setMsg(`Uploaded ${file.name} — its fingerprint (SHA-256) is recorded, so any later change is detectable.`);
       await load();
     } catch (err) {
@@ -104,12 +128,28 @@ export default function ItemDetailPage() {
 
   async function removeDoc(doc: Doc) {
     const supabase = createClient();
+    setError("");
+    setMsg("");
+    setConfirmDoc(null);
+    const { error } = await supabase.from("documents").delete().eq("id", doc.id);
+    if (error) {
+      setError(friendlyError(error.message));
+      return;
+    }
     await supabase.storage.from("documents").remove([doc.storage_path]);
-    await supabase.from("documents").delete().eq("id", doc.id);
+    setMsg(`${doc.file_name} was deleted.`);
     await load();
   }
 
-  if (!item) return <main><p className="sans">Loading…</p></main>;
+  if (missing) {
+    return (
+      <main>
+        <h1 style={{ marginBottom: 10 }}>Item not found</h1>
+        <p className="sans">It may have been removed. <Link href="/app/inventory">Back to your vault</Link></p>
+      </main>
+    );
+  }
+  if (!item) return <main><p className="sans muted" role="status">Loading…</p></main>;
 
   return (
     <main>
@@ -122,33 +162,44 @@ export default function ItemDetailPage() {
         {item.section ? ` · from checklist section ${item.section}` : ""}
       </p>
 
-      {msg && <div className="notice sans" style={{ marginBottom: 16 }}>{msg}</div>}
-      {error && <div className="error sans" style={{ marginBottom: 16 }}>{error}</div>}
+      {msg && <div className="notice sans" role="status" style={{ marginBottom: 16 }}>{msg}</div>}
+      {error && <div className="error sans" role="alert" style={{ marginBottom: 16 }}>{error}</div>}
 
       <div className="panel sans" style={{ marginBottom: 22, maxWidth: 640 }}>
         <h3 style={{ marginBottom: 10 }}>Details</h3>
-        <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 10 }}>Title</label>
-        <input type="text" defaultValue={item.title} key={`t-${item.id}`} onBlur={(e) => e.target.value.trim() && e.target.value !== item.title && save("title", e.target.value.trim())} style={{ width: "100%" }} />
-        <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Provider / institution</label>
-        <input type="text" list="kw-institutions-detail" defaultValue={item.provider_name ?? ""} key={`p-${item.id}`} onBlur={(e) => save("provider_name", e.target.value.trim() || null)} style={{ width: "100%" }} />
+        <label htmlFor="item-title" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 10 }}>Title</label>
+        <input id="item-title" type="text" defaultValue={item.title} key={`t-${item.id}`} onBlur={(e) => e.target.value.trim() && e.target.value !== item.title && save("title", e.target.value.trim())} style={{ width: "100%" }} />
+        <label htmlFor="item-provider" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Provider / institution</label>
+        <input id="item-provider" type="text" list="kw-institutions-detail" defaultValue={item.provider_name ?? ""} key={`p-${item.id}`} onBlur={(e) => save("provider_name", e.target.value.trim() || null)} style={{ width: "100%" }} />
         <datalist id="kw-institutions-detail">{COMMON_INSTITUTIONS.map((i) => (<option key={i} value={i} />))}</datalist>
-        <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Where is it stored?</label>
-        <input type="text" defaultValue={item.location ?? ""} key={`l-${item.id}`} onBlur={(e) => save("location", e.target.value.trim() || null)} style={{ width: "100%" }} />
+        <label htmlFor="item-location" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Where is it stored?</label>
+        <input id="item-location" type="text" defaultValue={item.location ?? ""} key={`l-${item.id}`} onBlur={(e) => save("location", e.target.value.trim() || null)} style={{ width: "100%" }} />
         {item.category === "account" && (<>
-          <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Account type</label>
-          <select defaultValue={item.account_type ?? ""} key={`at-${item.id}`} onChange={(e) => save("account_type", e.target.value || null)} style={{ width: "100%" }}>
+          <label htmlFor="item-account-type" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Account type</label>
+          <select id="item-account-type" defaultValue={item.account_type ?? ""} key={`at-${item.id}`} onChange={(e) => save("account_type", e.target.value || null)} style={{ width: "100%" }}>
             <option value="">—</option>
             {ACCOUNT_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}
           </select>
-          <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Last 4 digits (never the full number)</label>
-          <input type="text" inputMode="numeric" maxLength={4} defaultValue={item.last4 ?? ""} key={`l4-${item.id}`} onBlur={(e) => save("last4", e.target.value.replace(/\D/g, "").slice(0, 4) || null)} style={{ width: 120 }} />
+          <label htmlFor="item-last4" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Last 4 digits (never the full number)</label>
+          <input id="item-last4" type="text" inputMode="numeric" maxLength={4} defaultValue={item.last4 ?? ""} key={`l4-${item.id}`} onBlur={(e) => save("last4", e.target.value.replace(/\D/g, "").slice(0, 4) || null)} style={{ width: 120 }} />
         </>)}
-        <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
+        <label htmlFor="item-notes" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
           Notes — where it lives and how recovery works. <strong>Never a password.</strong>
         </label>
-        <textarea rows={4} defaultValue={item.notes ?? ""} key={`n-${item.id}`} onBlur={(e) => save("notes", e.target.value.trim() || null)} style={{ width: "100%" }} />
-        <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Renewal / expiry date</label>
-        <input type="date" defaultValue={item.renewal_date ?? ""} key={`r-${item.id}`} onBlur={(e) => save("renewal_date", e.target.value || null)} />
+        <textarea id="item-notes" rows={4} defaultValue={item.notes ?? ""} key={`n-${item.id}`} onBlur={(e) => save("notes", e.target.value.trim() || null)} style={{ width: "100%" }} />
+        <label htmlFor="item-renewal" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Renewal / expiry date — we email you a reminder 30 days and 7 days before</label>
+        <input id="item-renewal" type="date" defaultValue={item.renewal_date ?? ""} key={`r-${item.id}`} onBlur={(e) => save("renewal_date", e.target.value || null)} />
+        <label htmlFor="item-scope" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
+          Who receives this in an emergency
+        </label>
+        <select id="item-scope" defaultValue={item.release_scope_id ?? ""} key={`s-${item.id}`} onChange={(e) => save("release_scope_id", e.target.value || null)} style={{ width: "100%" }}>
+          <option value="">Every trusted contact</option>
+          {scopes.map((s) => (<option key={s.id} value={s.id}>Only contacts with the &ldquo;{s.name}&rdquo; scope</option>))}
+        </select>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
+          This item and its documents are included in the recovery package released to a trusted
+          contact after your waiting period. Manage scopes under <Link href="/app/contacts">Contacts &amp; scopes</Link>.
+        </p>
       </div>
 
       <div className="panel sans" style={{ maxWidth: 640 }}>
@@ -157,7 +208,7 @@ export default function ItemDetailPage() {
           Upload a copy (a will, a policy, a deed). Files are stored privately, and each file&rsquo;s
           SHA-256 fingerprint is recorded at upload so tampering is detectable.
         </p>
-        <input ref={fileRef} type="file" onChange={upload} disabled={busy} />
+        <input ref={fileRef} type="file" aria-label="Upload a document" onChange={upload} disabled={busy} />
         {busy && <p style={{ fontSize: 14, marginTop: 8 }}>Uploading…</p>}
         <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
           {docs.map((doc) => (
@@ -170,7 +221,14 @@ export default function ItemDetailPage() {
               </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <button onClick={() => download(doc)} style={{ background: "none", border: "none", color: "var(--green)", cursor: "pointer", textDecoration: "underline" }}>Download</button>
-                <button onClick={() => removeDoc(doc)} style={{ background: "none", border: "none", color: "#7c2d20", cursor: "pointer", textDecoration: "underline" }}>Delete</button>
+                {confirmDoc === doc.id ? (
+                  <>
+                    <button className="link-btn danger" onClick={() => removeDoc(doc)}>Yes, delete</button>
+                    <button className="link-btn muted" onClick={() => setConfirmDoc(null)}>Keep</button>
+                  </>
+                ) : (
+                  <button className="link-btn danger" onClick={() => setConfirmDoc(doc.id)}>Delete</button>
+                )}
               </div>
             </div>
           ))}

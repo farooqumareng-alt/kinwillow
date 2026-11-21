@@ -1,7 +1,17 @@
+import Link from "next/link";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { HOUSEHOLD_COOKIE, MEMBERSHIP_SELECT, pickHousehold, type MembershipRow } from "@/lib/household-select";
 import { healthScore, effectiveState, type VerifiedState } from "@/lib/continuity";
 
 export const dynamic = "force-dynamic";
+
+const PLAN_NAMES: Record<string, string> = {
+  free: "Free",
+  family: "Family",
+  family_parents: "Family + Parents",
+};
+const FIRST_ITEMS_GOAL = 10;
 
 export default async function Dashboard() {
   const supabase = await createClient();
@@ -11,13 +21,16 @@ export default async function Dashboard() {
 
   const { data: memberships } = await supabase
     .from("household_members")
-    .select("role, households ( name, plan_tier, status, waiting_period_hours )")
-    .eq("user_id", user?.id ?? "");
+    .select(MEMBERSHIP_SELECT)
+    .eq("user_id", user?.id ?? "")
+    .order("created_at", { ascending: true });
 
-  const first = memberships?.[0] as unknown as
-    | { role: string; households: { name: string; plan_tier: string; status: string; waiting_period_hours: number } }
-    | undefined;
-  const household = first?.households;
+  // Same choice as getMyHousehold(): the vault the user last switched to,
+  // otherwise their own.
+  const rows = (memberships ?? []) as unknown as MembershipRow[];
+  const preferred = (await cookies()).get(HOUSEHOLD_COOKIE)?.value;
+  const household = pickHousehold(rows, preferred)?.households ?? undefined;
+  const hid = household?.id;
 
   const { data: factors } = await supabase.auth.mfa.listFactors();
   const mfaOn = (factors?.totp ?? []).some((f) => f.status === "verified");
@@ -25,83 +38,131 @@ export default async function Dashboard() {
   let itemCount = 0;
   let sectionsStarted = 0;
   let docCount = 0;
+  let contactCount = 0;
+  let contactsTold = 0;
+  let recordCount = 0;
   let readinessScore: number | null = null;
   let attentionCount = 0;
-  if (household) {
-    const { data: membershipRow } = await supabase
-      .from("household_members")
-      .select("household_id")
-      .eq("user_id", user?.id ?? "")
-      .limit(1)
-      .single();
-    const hid = membershipRow?.household_id as string | undefined;
-    if (hid) {
-      const { count } = await supabase
+  let upcoming: Array<{ id: string; title: string; renewal_date: string }> = [];
+  if (hid) {
+    const today = new Date().toISOString().slice(0, 10);
+    const in60 = new Date(Date.now() + 60 * 24 * 3600_000).toISOString().slice(0, 10);
+    const [items, docs, contacts, recs, renewals] = await Promise.all([
+      supabase.from("inventory_items").select("section").eq("household_id", hid).eq("archived", false),
+      supabase.from("documents").select("id", { count: "exact", head: true }).eq("household_id", hid),
+      supabase.from("trusted_contacts").select("status, invited_at").eq("household_id", hid).neq("status", "removed"),
+      supabase.from("continuity_records").select("verified_state, criticality, recheck_due").eq("household_id", hid),
+      supabase
         .from("inventory_items")
-        .select("id", { count: "exact", head: true })
-        .eq("household_id", hid)
-        .eq("archived", false);
-      itemCount = count ?? 0;
-      const { data: secs } = await supabase
-        .from("inventory_items")
-        .select("section")
+        .select("id, title, renewal_date")
         .eq("household_id", hid)
         .eq("archived", false)
-        .not("section", "is", null);
-      sectionsStarted = new Set((secs ?? []).map((r: { section: number }) => r.section)).size;
-      const { count: dc } = await supabase
-        .from("documents")
-        .select("id", { count: "exact", head: true })
-        .eq("household_id", hid);
-      docCount = dc ?? 0;
-      const { data: recs } = await supabase
-        .from("continuity_records")
-        .select("verified_state, criticality, recheck_due")
-        .eq("household_id", hid);
-      if (recs) {
-        const typed = recs as unknown as Array<{
-          verified_state: VerifiedState;
-          criticality: string;
-          recheck_due: string | null;
-        }>;
-        readinessScore = healthScore(typed);
-        attentionCount = typed.filter((r) => {
-          const s = effectiveState(r);
-          return s === "stale" || s === "drift_suspected" || s === "not_started";
-        }).length;
-      }
-    }
+        .gte("renewal_date", today)
+        .lte("renewal_date", in60)
+        .order("renewal_date", { ascending: true })
+        .limit(5),
+    ]);
+    const itemRows = (items.data ?? []) as Array<{ section: number | null }>;
+    itemCount = itemRows.length;
+    sectionsStarted = new Set(itemRows.map((r) => r.section).filter((s) => s != null)).size;
+    docCount = docs.count ?? 0;
+    const contactRows = (contacts.data ?? []) as Array<{ status: string; invited_at: string | null }>;
+    contactCount = contactRows.length;
+    contactsTold = contactRows.filter((c) => c.status === "accepted" || c.invited_at).length;
+    upcoming = (renewals.data ?? []) as typeof upcoming;
+    const typed = (recs.data ?? []) as unknown as Array<{
+      verified_state: VerifiedState;
+      criticality: string;
+      recheck_due: string | null;
+    }>;
+    recordCount = typed.length;
+    readinessScore = healthScore(typed);
+    attentionCount = typed.filter((r) => {
+      const s = effectiveState(r);
+      return s === "stale" || s === "drift_suspected" || s === "not_started";
+    }).length;
   }
+
+  // The path from an empty vault to one a family could actually use.
+  const steps = [
+    {
+      done: itemCount >= FIRST_ITEMS_GOAL,
+      label: `Add your first ${FIRST_ITEMS_GOAL} items`,
+      detail:
+        itemCount >= FIRST_ITEMS_GOAL
+          ? `${itemCount} items so far.`
+          : `${itemCount} of ${FIRST_ITEMS_GOAL} — the guided setup walks you through it, one question at a time.`,
+      href: "/app/setup",
+      cta: itemCount === 0 ? "Start the guided setup" : "Continue the guided setup",
+    },
+    {
+      done: contactCount > 0,
+      label: "Name a trusted contact",
+      detail: "The person your family would turn to. Until you name someone, nobody can reach any of this.",
+      href: "/app/contacts",
+      cta: "Add a contact",
+    },
+    {
+      done: contactCount > 0 && contactsTold === contactCount,
+      label: "Make sure they have their link",
+      detail: "We email it with a plain explanation. A contact who doesn't know about the vault can't use it.",
+      href: "/app/contacts",
+      cta: "Email their link",
+    },
+    {
+      done: recordCount > 0,
+      label: "Switch on one legacy setting",
+      detail: "Apple, Google and Facebook each have their own tool for passing an account on. We walk you through it.",
+      href: "/app/continuity",
+      cta: "Open the Continuity Centre",
+    },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const nextStep = steps.find((s) => !s.done);
 
   return (
     <main>
-      <h1 style={{ fontSize: 32, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 6 }}>
-        {household ? household.name : "Your vault"}
-      </h1>
-      <p className="sans" style={{ color: "var(--muted)", marginBottom: 28 }}>
-        Plan: {household?.plan_tier ?? "free"} · Status: {household?.status ?? "active"} · Emergency
-        waiting period: {household ? Math.round(household.waiting_period_hours / 24) : 7} days
+      <h1 style={{ marginBottom: 6 }}>{household ? household.name : "Your vault"}</h1>
+      <p className="sans muted" style={{ marginBottom: 24 }}>
+        {household?.kind === "parents" ? "Your parents’ vault · " : ""}
+        Plan: {PLAN_NAMES[household?.plan_tier ?? "free"] ?? household?.plan_tier}
+        {household?.status === "sealed" ? " · Sealed (read-only)" : ""} · Emergency waiting period:{" "}
+        {household ? Math.round(household.waiting_period_hours / 24) : 7} days
       </p>
 
-      {!mfaOn && (
-        <div className="error sans" style={{ marginBottom: 24 }}>
-          Multi-factor authentication is not switched on yet. It&rsquo;s required before you can add
-          trusted contacts or recovery instructions —{" "}
-          <a href="/app/security">set it up now</a>.
+      {nextStep && (
+        <div className="panel sans" style={{ marginBottom: 24 }}>
+          <h3>
+            Getting your vault ready — {doneCount} of {steps.length} done
+          </h3>
+          <ol className="steps-list" style={{ marginTop: 12 }}>
+            {steps.map((s) => (
+              <li key={s.label} className={s.done ? "done" : undefined}>
+                <span className="mark" aria-hidden="true">{s.done ? "✓" : ""}</span>
+                <span>
+                  <span className="label">
+                    <span className="visually-hidden">{s.done ? "Done: " : "To do: "}</span>
+                    <strong>{s.label}</strong>
+                  </span>
+                  {!s.done && <span className="muted" style={{ display: "block", fontSize: 14 }}>{s.detail}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <Link className="btn" href={nextStep.href} style={{ marginTop: 16 }}>
+            {nextStep.cta}
+          </Link>
+        </div>
+      )}
+
+      {!nextStep && !mfaOn && (
+        <div className="notice sans" style={{ marginTop: 0, marginBottom: 24 }}>
+          Your sign-in is protected by your password and an emailed code. For a stronger second
+          step, <Link href="/app/security">add an authenticator app</Link>.
         </div>
       )}
 
       <div className="grid">
-        <div className="panel">
-          <h3>Readiness score</h3>
-          <div className="score">{readinessScore === null ? "—" : `${readinessScore}%`}</div>
-          <p>
-            {readinessScore === null
-              ? "Your score appears once you start a legacy check in the Continuity Centre."
-              : "Based on the verified legacy settings of the accounts you track."}{" "}
-            <a href="/app/continuity">Open the Continuity Centre →</a>
-          </p>
-        </div>
         <div className="panel">
           <h3>Your vault</h3>
           <p>
@@ -110,18 +171,46 @@ export default async function Dashboard() {
             sections started.
           </p>
           <p style={{ marginTop: 10 }}>
-            <a href="/app/setup">Continue the guided setup →</a>
+            <Link href="/app/setup">Continue the guided setup →</Link>
             <br />
-            <a href="/app/inventory">Open your vault →</a>
+            <Link href="/app/inventory">Open your vault →</Link>
           </p>
         </div>
         <div className="panel">
-          <h3>Needs attention</h3>
+          <h3>Coming up</h3>
+          {upcoming.length === 0 ? (
+            <p>
+              No renewal or expiry dates in the next 60 days. Add a date to any item and we&rsquo;ll
+              email you before it arrives.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", fontSize: 15 }}>
+              {upcoming.map((u) => (
+                <li key={u.id} style={{ padding: "3px 0" }}>
+                  <Link href={`/app/inventory/${u.id}`}>{u.title}</Link>{" "}
+                  <span className="muted">
+                    —{" "}
+                    {new Date(`${u.renewal_date}T00:00:00Z`).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      timeZone: "UTC",
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="panel">
+          <h3>Legacy settings</h3>
+          <div className="score">{readinessScore === null ? "—" : `${readinessScore}%`}</div>
           <p>
-            {attentionCount === 0
-              ? "Nothing needs attention right now."
-              : `${attentionCount} legacy check${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} attention — not started, stale, or drifting.`}{" "}
-            {attentionCount > 0 && <a href="/app/continuity">Review →</a>}
+            {readinessScore === null
+              ? "Your readiness score appears once you start a legacy check."
+              : attentionCount === 0
+                ? "Every legacy setting you track is confirmed and current."
+                : `${attentionCount} need${attentionCount === 1 ? "s" : ""} attention — not started, or due a re-check.`}{" "}
+            <Link href="/app/continuity">Open the Continuity Centre →</Link>
           </p>
         </div>
       </div>

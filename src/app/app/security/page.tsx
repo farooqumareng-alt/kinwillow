@@ -78,9 +78,11 @@ export default function SecurityPage() {
         Security
       </h1>
       <p style={{ color: "#38443c", maxWidth: 640, marginBottom: 24 }}>
-        Your vault holds the map to your whole digital life, so KinWillow asks for a second factor.
-        Use any authenticator app (Google Authenticator, Authy, 1Password, Apple Passwords).
-        MFA is required before you can add trusted contacts or recovery instructions.
+        Every sign-in already needs your password and a one-time code we email you. An
+        authenticator app adds a stronger step that does not depend on your inbox: once it is on,
+        its 6-digit code is asked for at every sign-in. Use any authenticator app (Google
+        Authenticator, Authy, 1Password, Apple Passwords). Keep the app safe — if you lose it,
+        you will need to contact us to get back in.
       </p>
 
       {msg && <div className="notice sans" style={{ maxWidth: 640, marginBottom: 18 }}>{msg}</div>}

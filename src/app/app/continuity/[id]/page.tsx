@@ -126,7 +126,7 @@ export default function ContinuityRecordPage() {
         recheck_due: recheckDue,
         drift_state: "none",
       });
-      setMsg("Verified. The confirmation text itself was not stored — only its fingerprint.");
+      setMsg("Confirmed with evidence. The confirmation text itself was not stored — only its fingerprint.");
     } else if (attest) {
       const statement = `Attested setup of ${provider.name} ${provider.mechanism_type} for ${record.account_ref ?? "account"} on ${new Date().toISOString()}`;
       const hash = await sha256Hex(statement);
@@ -144,7 +144,7 @@ export default function ContinuityRecordPage() {
         recheck_due: recheckDue,
         drift_state: "none",
       });
-      setMsg("Recorded as attested. A provider confirmation raises this to Verified.");
+      setMsg("Recorded as confirmed by you. Pasting the provider confirmation raises this to Confirmed with evidence.");
     } else {
       setMsg("Paste the provider's confirmation, or tick the attestation box.");
     }
@@ -261,7 +261,7 @@ export default function ContinuityRecordPage() {
         ) : (
           <p className="sans" style={{ maxWidth: 560 }}>
             {provider.name} shows no confirmation screen we can fingerprint, so this check is
-            verified by your attestation.
+            confirmed by your own statement.
           </p>
         )}
         <label className="sans" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12, maxWidth: 560 }}>
@@ -270,7 +270,7 @@ export default function ContinuityRecordPage() {
             {record.designated_recipient ?? "my trusted person"}.</span>
         </label>
         <button className="btn" onClick={submitEvidence} disabled={busy} style={{ marginTop: 12 }}>
-          {busy ? "Saving…" : verified ? "Re-verify with fresh evidence" : "Record the evidence"}
+          {busy ? "Saving…" : verified ? "Re-confirm with fresh evidence" : "Record the evidence"}
         </button>
         {record.evidence_hash && (
           <p className="sans" style={{ marginTop: 10, color: "var(--muted)", fontSize: 13 }}>

@@ -1,10 +1,8 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,8 +29,11 @@ export default function SignupPage() {
       return;
     }
     if (data.session) {
-      router.push("/app");
-      router.refresh();
+      // The address has not been proven yet, so this session cannot open the
+      // vault. Drop it and send the new user through the normal sign-in,
+      // which emails the 6-digit code.
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      window.location.assign("/login?created=1");
     } else {
       setNotice("Check your email to confirm your address — then sign in and your vault will be waiting.");
       setBusy(false);
@@ -53,8 +54,8 @@ export default function SignupPage() {
         <label htmlFor="password">Password</label>
         <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={10} />
         <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
-          At least 10 characters. You&rsquo;ll switch on multi-factor authentication inside the vault —
-          it&rsquo;s required before you can add trusted contacts.
+          At least 10 characters. Every sign-in also needs a one-time code we email you, and you
+          can add an authenticator app inside the vault.
         </p>
         {error && <div className="error">{error}</div>}
         {notice && <div className="notice">{notice}</div>}
