@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: 22
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -87,7 +87,10 @@ jobs:
 
       - name: Generate the Android project
         working-directory: android
-        run: yes "" | bubblewrap update --skipVersionUpgrade
+        run: |
+          set +o pipefail
+          yes "" | bubblewrap update --skipVersionUpgrade 2>&1 | tee generate.log
+          exit "${PIPESTATUS[1]}"
 
       - name: Build (signed)
         if: steps.prep.outputs.signed == 'true'
@@ -95,12 +98,35 @@ jobs:
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: yes "" | bubblewrap build --skipPwaValidation
+        run: |
+          set +o pipefail
+          yes "" | bubblewrap build --skipPwaValidation 2>&1 | tee build.log
+          exit "${PIPESTATUS[1]}"
 
       - name: Build (unsigned toolchain check)
         if: steps.prep.outputs.signed != 'true'
         working-directory: android
-        run: yes "" | bubblewrap build --skipPwaValidation --skipSigning
+        run: |
+          set +o pipefail
+          yes "" | bubblewrap build --skipPwaValidation --skipSigning 2>&1 | tee build.log
+          exit "${PIPESTATUS[1]}"
+
+      # Build logs are only visible to signed-in repository members. Put the
+      # end of a failed build's output into an error annotation so the cause
+      # shows on the run's summary page without opening the log.
+      - name: Report why the build failed
+        if: failure()
+        working-directory: android
+        run: |
+          for f in build.log generate.log; do
+            [ -f "$f" ] || continue
+            # Strip colour codes; keep the last lines; never echo secrets (none are printed by the build).
+            tail_text=$(sed -e 's/\x1b\[[0-9;]*[A-Za-z]//g' "$f" | grep -v '^[[:space:]]*$' | tail -n 45 | cut -c1-300)
+            encoded=$(printf '%s' "$tail_text" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN{ORS="%0A"}{print}')
+            echo "::error title=End of $f::${encoded:0:6000}"
+          done
+          echo "--- java"; java -version 2>&1 | head -2
+          echo "--- sdk"; ls "$ANDROID_HOME" | head -20; ls "$ANDROID_HOME/build-tools" 2>/dev/null | tail -5
 
       - name: Show what was built
         working-directory: android
