@@ -1,1 +1,26 @@
-{"background_color":"#faf7f0","description":"Everything your family would need, in one safe place. Not your passwords — the map to everything.","display":"standalone","icons":[{"purpose":"any","sizes":"192x192","src":"/icon-192.png","type":"image/png"},{"purpose":"any","sizes":"512x512","src":"/icon-512.png","type":"image/png"},{"purpose":"maskable","sizes":"512x512","src":"/icon-512.png","type":"image/png"}],"name":"KinWillow","orientation":"portrait","scope":"/","short_name":"KinWillow","start_url":"/","theme_color":"#2e5a3d"}
+{
+  "id": "/",
+  "name": "KinWillow — family continuity vault",
+  "short_name": "KinWillow",
+  "description": "Everything your family would need, in one safe place. Not your passwords — the map to everything.",
+  "start_url": "/app?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#faf7f0",
+  "theme_color": "#2e5a3d",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["productivity", "lifestyle", "finance"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Your vault", "short_name": "Vault", "url": "/app/inventory", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Guided setup", "short_name": "Setup", "url": "/app/setup", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Emergency", "short_name": "Emergency", "url": "/app/emergency", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

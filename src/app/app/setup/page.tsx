@@ -118,6 +118,25 @@ export default function SetupWizardPage() {
     );
   }
 
+  // Checklist questions that end "(yes / no)" are answered with one tap.
+  const YES_NO = /\s*\(yes \/ no\)\s*$/i;
+  async function answerYesNo(section: number, prompt: string, category: string, yes: boolean) {
+    const key = `${section}:${prompt}`;
+    const question = prompt.replace(YES_NO, "").replace(/\?\s*$/, "");
+    await insertItem(
+      {
+        title: `${question}: ${yes ? "yes" : "not yet"}`,
+        category,
+        section,
+        criticality: yes ? "medium" : "high",
+        notes: yes
+          ? `Checklist prompt: ${prompt}\nAnswer: Yes.`
+          : `Checklist prompt: ${prompt}\nAnswer: Not yet. The Continuity Centre walks through switching this on.`,
+      },
+      key
+    );
+  }
+
   async function skip(promptKey: string) {
     if (!householdId) return;
     const supabase = createClient();
@@ -287,6 +306,20 @@ export default function SetupWizardPage() {
                           </div>
                         );
                       }
+                      if (YES_NO.test(prompt)) {
+                        return (
+                          <div key={key} role="group" aria-label={prompt.replace(YES_NO, "")} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                            <span style={{ flex: "1 1 280px", fontSize: 14, color: "#38443c" }}>{prompt.replace(YES_NO, "")}</span>
+                            <button className="btn small" disabled={busyKey === key} onClick={() => answerYesNo(s.n, prompt, s.category, true)}>
+                              Yes
+                            </button>
+                            <button className="btn secondary small" disabled={busyKey === key} onClick={() => answerYesNo(s.n, prompt, s.category, false)}>
+                              Not yet
+                            </button>
+                            {skipBtn(key)}
+                          </div>
+                        );
+                      }
                       if (s.n === 4) {
                         const d = drafts[key] ?? {};
                         return (
@@ -330,6 +363,12 @@ export default function SetupWizardPage() {
                   <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
                     Entries land in <Link href="/app/inventory">Your vault</Link>, where you can add
                     notes, dates, and documents.
+                    {s.n === 5 && (
+                      <>
+                        {" "}Answered &ldquo;Not yet&rdquo;? The{" "}
+                        <Link href="/app/continuity">Continuity Centre</Link> walks you through switching each one on.
+                      </>
+                    )}
                   </p>
                 </div>
               )}

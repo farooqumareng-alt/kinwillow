@@ -22,6 +22,8 @@ const csp = [
   `img-src 'self' data: blob: ${supabaseOrigin}`,
   "font-src 'self' data:",
   `connect-src 'self' ${supabaseOrigin} ${supabaseWs}`,
+  "worker-src 'self'",
+  "manifest-src 'self'",
   "frame-src 'none'",
   "frame-ancestors 'none'",
   "object-src 'none'",
@@ -52,6 +54,13 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
       { source: "/package/:path*", headers: tokenPageHeaders },
       { source: "/request-access/:path*", headers: tokenPageHeaders },
       { source: "/reset-password", headers: tokenPageHeaders },

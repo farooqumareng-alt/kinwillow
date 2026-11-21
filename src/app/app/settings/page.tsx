@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getMyHousehold, type HouseholdInfo } from "@/lib/household";
+import InstallApp from "@/components/InstallApp";
 
 const PLAN_NAMES: Record<string, string> = {
   free: "Free",
@@ -114,6 +115,7 @@ export default function SettingsPage() {
             Open Security
           </a>
         </div>
+        <InstallApp />
         <div className="panel sans">
           <h3>Delete this account</h3>
           {deleteOn ? (

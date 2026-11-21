@@ -64,7 +64,7 @@ export default function PartnerPage() {
             accounts are set up by KinWillow.
           </p>
           <p style={{ marginTop: 10 }}>
-            <a className="btn" href="/contact?topic=partnership">Ask about becoming a partner</a>
+            <a className="btn" href="/partners#apply">Apply to be a partner</a>
           </p>
         </div>
       ) : (
