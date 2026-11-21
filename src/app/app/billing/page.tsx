@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getMyHousehold, getOwnHousehold, type HouseholdInfo } from "@/lib/household";
+import { inStoreApp } from "@/lib/store-app";
 
 type Sub = { tier: string | null; status: string | null; current_period_end: string | null } | null;
 
@@ -23,6 +24,7 @@ export default function BillingPage() {
   const [confirm, setConfirm] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [storeApp, setStoreApp] = useState(false);
 
   async function load() {
     const own = await getOwnHousehold();
@@ -38,6 +40,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     (async () => {
+      setStoreApp(inStoreApp());
       const params = new URLSearchParams(window.location.search);
       const own = await load();
       setLoading(false);
@@ -103,6 +106,24 @@ export default function BillingPage() {
 
   if (loading) return <main><p className="sans muted" role="status">Loading…</p></main>;
   const tier = household?.plan_tier ?? "free";
+
+  if (storeApp) {
+    return (
+      <main>
+        <h1 style={{ marginBottom: 6 }}>Your plan</h1>
+        <div className="panel sans" style={{ maxWidth: 620, marginTop: 18 }}>
+          <h3>{PLAN_NAMES[tier]?.split(" — ")[0] ?? tier}</h3>
+          <p>
+            {tier === "free"
+              ? "You are on the Free plan: up to 25 items and 1 trusted contact."
+              : "Your plan is active on this account, on every device you sign in on."}
+            {household?.status === "sealed" ? " Your vault is currently sealed (read-only)." : ""}
+          </p>
+          <p style={{ marginTop: 10 }}>Plans can&rsquo;t be bought or changed in this app.</p>
+        </div>
+      </main>
+    );
+  }
 
   // With a live plan, switching changes the existing subscription and Stripe
   // charges or credits the difference — so ask first.

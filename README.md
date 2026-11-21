@@ -31,6 +31,25 @@ Server errors are written to the Vercel log as one JSON line each
 (`src/instrumentation.ts`); the reference shown on the error page is the
 `digest` to search for.
 
+## Mobile apps
+
+The site is an installable PWA (`public/manifest.webmanifest`, `public/sw.js`).
+The store apps are thin wrappers around the live site, so they update whenever
+the site deploys.
+
+- **Android:** a Trusted Web Activity. Generate it at pwabuilder.com from
+  `https://www.kinwillow.com` (package id `com.kinwillow.app`, start URL
+  `/app?source=twa`), upload the `.aab` to Play Console, then put the app
+  signing certificate's SHA-256 fingerprint in `ANDROID_CERT_SHA256` and
+  redeploy. `/.well-known/assetlinks.json` then links app and site; without it
+  the app shows a browser address bar.
+- **iOS:** a native wrapper (PWABuilder's iOS package or Capacitor), built in
+  Xcode on a Mac. Start URL `/app?source=ios-app`.
+- Inside either store app the Billing page shows the current plan only, with no
+  purchase buttons (`src/lib/store-app.ts`), because the stores restrict how
+  digital subscriptions may be sold in apps.
+- `/delete-account` is the public account-deletion page both stores ask for.
+
 ## Migrations added by the safety-net change
 
 Run both in the Supabase SQL editor; neither depends on deploy order:
