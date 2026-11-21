@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { brandedEmail } from "@/lib/email";
 import crypto from "node:crypto";
+import { clientIp, withinLimits, tooManyRequests, MINUTE, HOUR } from "@/lib/rate-limit";
 
 // Contact form step 1 — ported from the Stage 1 serverless function.
 // Stores a PENDING message and emails a 6-digit verification code.
@@ -20,6 +21,13 @@ export async function POST(req: Request) {
     if (!cleanName || !cleanMessage || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       return NextResponse.json({ ok: false, error: "Please complete the form." }, { status: 400 });
     }
+    // This endpoint emails whatever address it is given, so cap it per caller
+    // and per recipient: it must not be usable to flood someone's inbox.
+    const allowed = await withinLimits([
+      { action: "contact:ip", subject: clientIp(req), limit: 5, windowSeconds: 10 * MINUTE },
+      { action: "contact:email", subject: cleanEmail, limit: 3, windowSeconds: HOUR },
+    ]);
+    if (!allowed) return tooManyRequests();
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceKey) {

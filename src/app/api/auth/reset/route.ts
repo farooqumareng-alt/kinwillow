@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { clientIp, withinLimits, tooManyRequests, HOUR } from "@/lib/rate-limit";
 
 // Password reset, step 1 (POST { email }): send the recovery email. The
 // response is identical whether or not the address has an account.
@@ -11,7 +12,14 @@ const MIN_LENGTH = 10;
 export async function POST(req: Request) {
   const { email } = await req.json().catch(() => ({}));
   const cleanEmail = String(email || "").trim().toLowerCase();
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+  if (!(await withinLimits([{ action: "reset:ip", subject: clientIp(req), limit: 5, windowSeconds: HOUR }]))) {
+    return tooManyRequests();
+  }
+  // Per-address cap: over it, answer exactly as usual but send nothing.
+  const emailOk =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) &&
+    (await withinLimits([{ action: "reset:email", subject: cleanEmail, limit: 3, windowSeconds: HOUR }]));
+  if (emailOk) {
     const supabase = await createClient();
     const origin = new URL(req.url).origin;
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {

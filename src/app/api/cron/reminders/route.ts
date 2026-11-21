@@ -185,6 +185,17 @@ export async function GET(req: Request) {
     }
   }
 
+  // ----- 4: housekeeping — rows nobody needs after a day or two -----
+  const twoDaysAgo = new Date(now.getTime() - 2 * DAY).toISOString();
+  for (const [table, column] of [
+    ["rate_limits", "window_start"],
+    ["login_codes", "created_at"],
+    ["contact_pending", "created_at"],
+  ] as const) {
+    const { error } = await service.from(table).delete().lt(column, twoDaysAgo);
+    if (error) console.error(`[cron] could not prune ${table}`, error.message);
+  }
+
   console.log("[cron] reminders job finished", JSON.stringify(summary));
   return NextResponse.json({ ok: true, ...summary });
 }

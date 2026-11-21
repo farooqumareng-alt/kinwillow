@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyOwner, type DisclosureRequestRow } from "@/lib/release";
+import { clientIp, withinLimits, tooManyRequests, HOUR, DAY } from "@/lib/rate-limit";
 
 // Public: a trusted contact submits an emergency disclosure request using
 // their personal request token. Creates the request in WAITING state with
@@ -13,6 +14,14 @@ export async function POST(req: Request) {
   if (!token || (requestClass !== "death" && requestClass !== "incapacity")) {
     return NextResponse.json({ error: "A valid link and request type are required" }, { status: 400 });
   }
+
+  // Each request emails the owner and starts a waiting period, so a contact
+  // (or anyone holding their link) cannot fire them repeatedly.
+  const allowed = await withinLimits([
+    { action: "disclosure:ip", subject: clientIp(req), limit: 10, windowSeconds: HOUR },
+    { action: "disclosure:token", subject: token, limit: 3, windowSeconds: DAY },
+  ]);
+  if (!allowed) return tooManyRequests("Too many requests from this link. Please try again tomorrow.");
 
   let service;
   try {

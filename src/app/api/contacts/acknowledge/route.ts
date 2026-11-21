@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { clientIp, withinLimits, tooManyRequests, HOUR } from "@/lib/rate-limit";
 
 // Public: a trusted contact confirms they received and saved their personal
 // link. It is a button press (POST), never a page view, so email scanners that
@@ -8,6 +9,10 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const token = body?.request_token as string | undefined;
   if (!token || token.length < 20) return NextResponse.json({ error: "This link is not valid" }, { status: 400 });
+
+  if (!(await withinLimits([{ action: "acknowledge:ip", subject: clientIp(req), limit: 30, windowSeconds: HOUR }]))) {
+    return tooManyRequests();
+  }
 
   let service;
   try {
