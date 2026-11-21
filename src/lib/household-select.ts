@@ -22,19 +22,31 @@ export interface MembershipRow {
   households: HouseholdSummary | null;
 }
 
+// A user can belong to three kinds of vault: their own (they are its owner),
+// their parents' (also owner), and vaults they were invited to help with
+// (role "proxy" — a practitioner helping a client). A client's vault is also
+// kind "own", so "mine" always means kind "own" AND role "owner".
+const isMine = (r: MembershipRow) => r.households?.kind === "own" && r.role === "owner";
+
 /** The preferred household if the user belongs to it, else their own, else the first. */
 export function pickHousehold<T extends MembershipRow>(rows: T[], preferredId?: string | null): T | undefined {
   const valid = rows.filter((r) => r.households);
   return (
     (preferredId ? valid.find((r) => r.households!.id === preferredId) : undefined) ??
-    valid.find((r) => r.households!.kind === "own") ??
+    valid.find(isMine) ??
     valid[0]
   );
 }
 
-/** The household that carries the plan and billing. */
+/** The user's own household — the one that carries their plan and billing. Never a client's. */
 export function ownHousehold<T extends MembershipRow>(rows: T[]): T | undefined {
-  return rows.find((r) => r.households?.kind === "own") ?? rows.find((r) => r.households);
+  return rows.find(isMine);
+}
+
+/** How a vault relates to the signed-in user, for labels. */
+export function relationLabel(row: { role: string; kind: HouseholdKind }): string {
+  if (row.role !== "owner") return "helping";
+  return row.kind === "parents" ? "parents" : "yours";
 }
 
 export const MEMBERSHIP_SELECT =

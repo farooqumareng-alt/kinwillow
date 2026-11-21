@@ -43,7 +43,9 @@ export async function listMyHouseholds(): Promise<HouseholdInfo[]> {
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
   const rows = ((data ?? []) as unknown as MembershipRow[]).filter((r) => r.households);
-  return rows.map(toInfo).sort((a, b) => Number(a.kind !== "own") - Number(b.kind !== "own"));
+  // Your own vault first, then your parents', then vaults you help with.
+  const rank = (h: HouseholdInfo) => (h.role !== "owner" ? 2 : h.kind === "own" ? 0 : 1);
+  return rows.map(toInfo).sort((a, b) => rank(a) - rank(b));
 }
 
 /**

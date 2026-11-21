@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ownHousehold, pickHousehold, type MembershipRow } from "@/lib/household-select";
+import { ownHousehold, pickHousehold, relationLabel, type MembershipRow } from "@/lib/household-select";
 
 const row = (id: string, kind: "own" | "parents"): MembershipRow => ({
   role: "owner",
@@ -31,5 +31,30 @@ describe("choosing the active household", () => {
 
   it("billing always resolves to the own household", () => {
     expect(ownHousehold(rows)?.households?.id).toBe("own-1");
+  });
+
+  describe("a practitioner who also helps with client vaults", () => {
+    // A client's vault is kind "own" too — it is the client's own.
+    const client: MembershipRow = { ...row("client-1", "own"), role: "proxy", grant_level: "edit" };
+    const mixed = [client, row("own-1", "own")];
+
+    it("defaults to their own vault, never a client's", () => {
+      expect(pickHousehold(mixed)?.households?.id).toBe("own-1");
+    });
+
+    it("can switch into a client's vault", () => {
+      expect(pickHousehold(mixed, "client-1")?.households?.id).toBe("client-1");
+    });
+
+    it("never treats a client's vault as the one that carries their billing", () => {
+      expect(ownHousehold(mixed)?.households?.id).toBe("own-1");
+      expect(ownHousehold([client])).toBeUndefined();
+    });
+
+    it("labels each vault by how it relates to them", () => {
+      expect(relationLabel({ role: "proxy", kind: "own" })).toBe("helping");
+      expect(relationLabel({ role: "owner", kind: "parents" })).toBe("parents");
+      expect(relationLabel({ role: "owner", kind: "own" })).toBe("yours");
+    });
   });
 });

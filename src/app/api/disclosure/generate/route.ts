@@ -24,10 +24,18 @@ export async function POST(req: Request) {
     .eq("id", requestId)
     .single();
   if (!request) return NextResponse.json({ error: "Request not found" }, { status: 404 });
-  // has_member_edit, not has_edit_grant: release must keep working for a
-  // sealed (lapsed, read-only) household.
-  const { data: canEdit } = await supabase.rpc("has_member_edit", { hid: request.household_id });
-  if (!canEdit) return NextResponse.json({ error: "You cannot release this request" }, { status: 403 });
+  // Owner only (a helper invited into the vault cannot release), and not
+  // tied to the plan, so it keeps working for a sealed (read-only) household.
+  const ownerCheck = await supabase.rpc("is_household_owner", { hid: request.household_id });
+  let isOwner = ownerCheck.data === true;
+  if (ownerCheck.error) {
+    // is_household_owner arrives with migration 000016. Until it is run there
+    // are no helpers, so every editor is the owner: fall back to that check.
+    console.error("[disclosure] is_household_owner() is unavailable — has migration 000016 been run?", ownerCheck.error.message);
+    const fallback = await supabase.rpc("has_member_edit", { hid: request.household_id });
+    isOwner = fallback.data === true;
+  }
+  if (!isOwner) return NextResponse.json({ error: "Only the vault's owner can release this request" }, { status: 403 });
   if (request.state !== "waiting") {
     return NextResponse.json({ error: `This request is ${request.state}` }, { status: 409 });
   }

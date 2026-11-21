@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/admin";
 
 // All Super Admin mutations go through this one route: the admin check runs
@@ -44,6 +45,24 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     await audit(householdId, `household_${status}`, "household", householdId);
     return NextResponse.json({ ok: true });
+  }
+
+  if (action === "set_partner") {
+    const userId = body.user_id as string;
+    const makePartner = body.is_partner === true;
+    if (!userId) return NextResponse.json({ error: "user_id is required" }, { status: 400 });
+    const { data: profile } = await service.from("profiles").select("partner_code").eq("user_id", userId).maybeSingle();
+    if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    // A code is issued once and kept, so links already shared keep working if
+    // partner status is removed and later restored.
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const code =
+      profile.partner_code ??
+      Array.from(randomBytes(8), (b) => alphabet[b % alphabet.length]).join("");
+    const { error } = await service.from("profiles").update({ is_partner: makePartner, partner_code: code }).eq("user_id", userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await audit(null, makePartner ? "partner_granted" : "partner_removed", "profile", userId);
+    return NextResponse.json({ ok: true, partner_code: code });
   }
 
   if (action === "inbox_state") {

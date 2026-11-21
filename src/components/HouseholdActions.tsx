@@ -9,6 +9,9 @@ export type HouseholdRow = {
   status: string;
   waiting_period_hours: number;
   owner_email: string | null;
+  owner_id: string;
+  owner_is_partner: boolean;
+  owner_partner_code: string | null;
   members: number;
   created_at: string;
 };
@@ -49,6 +52,7 @@ export default function HouseholdActions({ rows }: { rows: HouseholdRow[] }) {
               <div style={{ color: "var(--muted)", fontSize: 13 }}>
                 Plan: {r.plan_tier} · Status: {r.status} · Wait: {Math.round(r.waiting_period_hours / 24)}d ·
                 Members: {r.members} · Since {new Date(r.created_at).toLocaleDateString()}
+                {r.owner_is_partner ? ` · Partner (code ${r.owner_partner_code})` : ""}
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -61,6 +65,13 @@ export default function HouseholdActions({ rows }: { rows: HouseholdRow[] }) {
                 <option value="family">family</option>
                 <option value="family_parents">family_parents</option>
               </select>
+              <button
+                className="btn secondary"
+                disabled={busy === r.id}
+                onClick={() => act(r.id, { action: "set_partner", user_id: r.owner_id, is_partner: !r.owner_is_partner })}
+              >
+                {r.owner_is_partner ? "Remove partner" : "Make partner"}
+              </button>
               {r.status === "active" ? (
                 <button className="btn secondary" disabled={busy === r.id} onClick={() => act(r.id, { action: "set_status", status: "sealed" })}>
                   Seal

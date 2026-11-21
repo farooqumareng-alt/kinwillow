@@ -25,7 +25,8 @@ export default async function SiteFooter() {
       </p>
       <p style={{ marginTop: 8 }}>
         © 2026 KinWillow · <Link href="/contact">Contact us</Link> · <Link href="/privacy">Privacy</Link> ·{" "}
-        <Link href="/terms">Terms</Link> · <Link href="/security">Security</Link>
+        <Link href="/terms">Terms</Link> · <Link href="/security">Security</Link> ·{" "}
+        <Link href="/pledge">Continuity Pledge</Link>
       </p>
     </footer>
   );

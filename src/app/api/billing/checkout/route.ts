@@ -72,6 +72,15 @@ export async function POST(req: Request) {
     }
   }
 
+  // Clients who signed up through a partner's link get the partner discount,
+  // if one is configured (a Stripe coupon id in STRIPE_PARTNER_COUPON).
+  const coupon = process.env.STRIPE_PARTNER_COUPON;
+  let referred = false;
+  if (coupon) {
+    const { data: profile } = await supabase.from("profiles").select("referred_by").eq("user_id", user.id).maybeSingle();
+    referred = Boolean(profile?.referred_by);
+  }
+
   const origin = req.headers.get("origin") ?? siteUrl();
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
@@ -81,6 +90,7 @@ export async function POST(req: Request) {
     client_reference_id: householdId,
     metadata,
     subscription_data: { metadata },
+    ...(coupon && referred ? { discounts: [{ coupon }] } : {}),
     success_url: `${origin}/app/billing?upgraded=1`,
     cancel_url: `${origin}/app/billing`,
   });

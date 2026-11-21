@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       { status: 402 }
     );
   }
-  const existing = rows.find((r) => r.households?.kind === "parents");
+  const existing = rows.find((r) => r.households?.kind === "parents" && r.role === "owner");
   if (existing?.households) {
     return NextResponse.json({ ok: true, household_id: existing.households.id, already_existed: true });
   }
