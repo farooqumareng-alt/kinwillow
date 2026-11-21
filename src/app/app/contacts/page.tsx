@@ -119,8 +119,8 @@ export default function ContactsPage() {
         Trusted contacts have no access to your vault in normal times. Each contact has a personal
         link they can use to request your recovery information in an emergency — release only ever
         happens after your waiting period, and you can veto it at any time. Scopes control which
-        accounts a contact&rsquo;s package includes; accounts without a scope are included for
-        every contact.
+        vault items and accounts a contact&rsquo;s package includes; anything without a scope is
+        included for every contact.
       </p>
 
       <h2 style={{ fontSize: 22, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 10 }}>
@@ -172,8 +172,8 @@ export default function ContactsPage() {
         <div className="panel">
           <h3>Release scopes</h3>
           <p className="sans" style={{ color: "var(--muted)", marginBottom: 10 }}>
-            Group accounts (e.g. &ldquo;Financial only&rdquo;) and assign each continuity record a
-            scope on its page. {household?.plan_tier === "free" ? "Free includes 1 scope." : ""}
+            Group things (e.g. &ldquo;Financial only&rdquo;) and assign a scope to any vault item or
+            continuity record on its page. {household?.plan_tier === "free" ? "Free includes 1 scope." : ""}
           </p>
           <ul className="sans" style={{ paddingLeft: 18, marginBottom: 12 }}>
             {scopes.map((s) => (

@@ -1,6 +1,21 @@
 // Shared branded email: every KinWillow email goes out through Resend in the
 // same professional shell (logo header, brand colours, plain footer).
-// Sends never throw — callers treat email as best-effort unless they check.
+// Sends never throw — they return false and log, so callers can retry.
+
+/** Public base URL for links in emails (no trailing slash). */
+export function siteUrl(): string {
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.kinwillow.com").replace(/\/+$/, "");
+}
+
+/** Escape user-supplied text before interpolating it into email HTML. */
+export function escapeHtml(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 const SHELL = (inner: string) => `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
@@ -47,7 +62,10 @@ export async function sendEmail(opts: {
   from?: string;
 }): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
-  if (!key) return false;
+  if (!key) {
+    console.error(`[email] RESEND_API_KEY is not set; "${opts.subject}" was not sent`);
+    return false;
+  }
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -61,8 +79,12 @@ export async function sendEmail(opts: {
         ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
       }),
     });
+    if (!res.ok) {
+      console.error(`[email] Resend rejected "${opts.subject}" with status ${res.status}`);
+    }
     return res.ok;
-  } catch {
+  } catch (err) {
+    console.error(`[email] sending "${opts.subject}" failed`, err);
     return false;
   }
 }

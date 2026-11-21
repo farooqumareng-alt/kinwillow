@@ -1,10 +1,8 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,8 +29,11 @@ export default function SignupPage() {
       return;
     }
     if (data.session) {
-      router.push("/app");
-      router.refresh();
+      // The address has not been proven yet, so this session cannot open the
+      // vault. Drop it and send the new user through the normal sign-in,
+      // which emails the 6-digit code.
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      window.location.assign("/login?created=1");
     } else {
       setNotice("Check your email to confirm your address — then sign in and your vault will be waiting.");
       setBusy(false);

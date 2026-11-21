@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { brandedEmail, sendEmail } from "@/lib/email";
+import { notifyOwner, type DisclosureRequestRow } from "@/lib/release";
 
 // Public: a trusted contact submits an emergency disclosure request using
 // their personal request token. Creates the request in WAITING state with
@@ -73,35 +73,30 @@ export async function POST(req: Request) {
     p_entity_id: request.id,
   });
 
-  // Notify the household owner (best-effort): they may veto during the wait.
+  // Notify the household owner so they can veto during the wait. The veto is
+  // the safeguard, so the outcome is recorded: the scheduled job retries a
+  // failed notification and never auto-releases a request the owner was not
+  // told about.
+  let ownerNotified = false;
   try {
-    const { data: ownerMember } = await service
-      .from("household_members")
-      .select("user_id")
-      .eq("household_id", contact.household_id)
-      .eq("role", "owner")
-      .single();
-    const { data: ownerProfile } = ownerMember
-      ? await service.from("profiles").select("email").eq("id", ownerMember.user_id).single()
-      : { data: null };
-    if (ownerProfile?.email) {
-      const releaseStr = releaseAt.toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" });
-      await sendEmail({
-        to: ownerProfile.email,
-        subject: "Emergency access requested for your KinWillow vault",
-        html: brandedEmail({
-          heading: "Emergency access has been requested",
-          bodyHtml:
-            `<p>Your trusted contact <strong>${contact.name}</strong> has requested emergency access to your KinWillow vault (reason given: ${requestClass === "death" ? "death of the account owner" : "incapacity of the account owner"}).</p>` +
-            (reason ? `<p style="color:#55534a;">“${reason.replace(/</g, "&lt;")}”</p>` : "") +
-            `<p><strong>Nothing has been shared.</strong> Under your settings, the waiting period ends <strong>${releaseStr}</strong>. If this request is wrong, sign in and veto it before then — a veto stops it completely.</p>`,
-          ctaLabel: "Review the request",
-          ctaUrl: "https://www.kinwillow.com/app/emergency",
-          footnote: "If you expected this request, no action is needed. KinWillow never shares anything before the waiting period ends.",
-        }),
-      });
+    ownerNotified = await notifyOwner(service, request as DisclosureRequestRow, "initial");
+    if (ownerNotified) {
+      await service
+        .from("disclosure_requests")
+        .update({ owner_notified_at: new Date().toISOString() })
+        .eq("id", request.id);
     }
-  } catch { /* notification is best-effort */ }
+  } catch (err) {
+    console.error(`[disclosure] request ${request.id}: owner notification threw`, err);
+  }
+  if (!ownerNotified) {
+    console.error(`[disclosure] request ${request.id}: owner NOT notified; the scheduled job will retry`);
+  }
 
-  return NextResponse.json({ ok: true, release_at: request.release_at, waiting_hours: hours });
+  return NextResponse.json({
+    ok: true,
+    release_at: request.release_at,
+    waiting_hours: hours,
+    owner_notified: ownerNotified,
+  });
 }

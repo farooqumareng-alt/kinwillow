@@ -1,32 +1,66 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-// Two-step sign-in: step 1 checks email + password and emails a 6-digit
-// code; step 2 verifies the code before any session exists. The password
-// is held in component state only, never persisted.
+// Sign-in: step 1 checks email + password and emails a 6-digit code; step 2
+// verifies the code before any usable session exists; step 3 (only when an
+// authenticator app is switched on) asks for its code. The password is held
+// in component state only, never persisted.
+type Step = "password" | "code" | "mfa";
+
+const linkButton = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  color: "var(--green)",
+  cursor: "pointer",
+  fontSize: 14,
+} as const;
+
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"password" | "code">("password");
+  const [step, setStep] = useState<Step>("password");
+  const [next, setNext] = useState("/app");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function requestCode(): Promise<boolean> {
-    const res = await fetch("/api/auth/login/start", {
+  // Read the query string on the client (keeps this page statically renderable).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("next");
+    // Only ever return to a page inside the vault — never an outside URL.
+    if (target && /^\/app(\/[\w\-/]*)?$/.test(target)) setNext(target);
+    if (params.get("step") === "mfa") setStep("mfa");
+    if (params.get("created") === "1") {
+      setInfo("Your vault is created. Sign in to open it — we'll email you a 6-digit code.");
+    }
+    if (params.get("error") === "auth") {
+      setError("That link didn't work or has expired. Please sign in below.");
+    }
+  }, []);
+
+  function finish() {
+    // A full navigation, so the server sees the new session cookies.
+    window.location.assign(next);
+  }
+
+  async function post(url: string, body: Record<string, string>) {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      setError(data.error || "Something went wrong.");
-      return false;
-    }
-    return true;
+    return { ok: res.ok && data.ok === true, data };
+  }
+
+  async function requestCode(): Promise<boolean> {
+    const { ok, data } = await post("/api/auth/login/start", { email, password });
+    if (!ok) setError(data.error || "Something went wrong.");
+    return ok;
   }
 
   async function submitPassword(e: React.FormEvent) {
@@ -46,19 +80,33 @@ export default function LoginPage() {
     setBusy(true);
     setError("");
     setInfo("");
-    const res = await fetch("/api/auth/login/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, code }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok || !data.ok) {
+    const { ok, data } = await post("/api/auth/login/verify", { email, password, code });
+    if (!ok) {
+      setBusy(false);
       setError(data.error || "Something went wrong.");
       return;
     }
-    router.push("/app");
-    router.refresh();
+    if (data.mfa_required) {
+      setBusy(false);
+      setCode("");
+      setStep("mfa");
+      return;
+    }
+    finish();
+  }
+
+  async function submitMfa(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setInfo("");
+    const { ok, data } = await post("/api/auth/login/mfa", { code });
+    if (!ok) {
+      setBusy(false);
+      setError(data.error || "Something went wrong.");
+      return;
+    }
+    finish();
   }
 
   async function resend() {
@@ -79,6 +127,53 @@ export default function LoginPage() {
     setInfo("");
   }
 
+  async function startOver() {
+    setBusy(true);
+    await createClient().auth.signOut({ scope: "local" }).catch(() => {});
+    window.location.assign("/login");
+  }
+
+  const codeInput = (
+    <input
+      id="code"
+      type="text"
+      inputMode="numeric"
+      autoComplete="one-time-code"
+      maxLength={6}
+      pattern="[0-9]{6}"
+      placeholder="123456"
+      value={code}
+      onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+      required
+      autoFocus
+    />
+  );
+
+  if (step === "mfa") {
+    return (
+      <main className="page">
+        <h1 style={{ textAlign: "center" }}>Authenticator code</h1>
+        <form className="card sans" onSubmit={submitMfa}>
+          <p style={{ fontSize: 15, color: "var(--muted)", textAlign: "center" }}>
+            Open your authenticator app and enter the 6-digit code it shows for KinWillow.
+          </p>
+          <label htmlFor="code">Authenticator code</label>
+          {codeInput}
+          {error && <div className="error" role="alert">{error}</div>}
+          <button className="btn" type="submit" disabled={busy}>{busy ? "Verifying…" : "Verify and open my vault"}</button>
+          <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 16, textAlign: "center" }}>
+            <button type="button" onClick={startOver} disabled={busy} style={linkButton}>
+              Sign in as someone else
+            </button>
+          </p>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 10, textAlign: "center" }}>
+            Lost your authenticator? <a href="/contact">Contact us</a> and we&rsquo;ll help you back in.
+          </p>
+        </form>
+      </main>
+    );
+  }
+
   if (step === "code") {
     return (
       <main className="page">
@@ -88,38 +183,16 @@ export default function LoginPage() {
             We sent a 6-digit sign-in code to <strong style={{ color: "var(--ink)" }}>{email}</strong>.
           </p>
           <label htmlFor="code">Sign-in code</label>
-          <input
-            id="code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            pattern="[0-9]{6}"
-            placeholder="123456"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            required
-            autoFocus
-          />
-          {info && <div className="notice">{info}</div>}
-          {error && <div className="error">{error}</div>}
+          {codeInput}
+          {info && <div className="notice" role="status">{info}</div>}
+          {error && <div className="error" role="alert">{error}</div>}
           <button className="btn" type="submit" disabled={busy}>{busy ? "Verifying…" : "Verify and sign in"}</button>
           <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 16, textAlign: "center" }}>
-            <button
-              type="button"
-              onClick={resend}
-              disabled={busy}
-              style={{ background: "none", border: "none", padding: 0, color: "var(--green)", cursor: "pointer", fontSize: 14 }}
-            >
+            <button type="button" onClick={resend} disabled={busy} style={linkButton}>
               Resend code
             </button>
             {" · "}
-            <button
-              type="button"
-              onClick={back}
-              disabled={busy}
-              style={{ background: "none", border: "none", padding: 0, color: "var(--green)", cursor: "pointer", fontSize: 14 }}
-            >
+            <button type="button" onClick={back} disabled={busy} style={linkButton}>
               Back
             </button>
           </p>
@@ -136,7 +209,8 @@ export default function LoginPage() {
         <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
         <label htmlFor="password">Password</label>
         <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
-        {error && <div className="error">{error}</div>}
+        {info && <div className="notice" role="status">{info}</div>}
+        {error && <div className="error" role="alert">{error}</div>}
         <button className="btn" type="submit" disabled={busy}>{busy ? "Sending code…" : "Continue"}</button>
         <p style={{ fontSize: 14, color: "var(--muted)", marginTop: 16, textAlign: "center" }}>
           New to KinWillow? <a href="/signup">Create your vault</a>

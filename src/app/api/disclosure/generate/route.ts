@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { brandedEmail, sendEmail } from "@/lib/email";
-import { buildPackageContent } from "@/lib/disclosure";
+import { releaseRequest } from "@/lib/release";
 
-// Owner action: once a request's waiting period has passed without a veto,
-// generate the per-contact recovery package (state-gated content snapshot)
-// and mark the request RELEASED. The contact opens it via a time-limited link.
+// Owner action: release a request now, once its waiting period has passed.
+// Release also happens automatically (see /api/cron/disclosure) — this is the
+// owner choosing not to wait for the next scheduled run.
 export async function POST(req: Request) {
   const supabase = await createClient();
   const {
@@ -18,18 +17,21 @@ export async function POST(req: Request) {
   const requestId = body?.request_id as string | undefined;
   if (!requestId) return NextResponse.json({ error: "request_id is required" }, { status: 400 });
 
+  // Read through the user's own session: row-level security proves membership.
   const { data: request } = await supabase
     .from("disclosure_requests")
-    .select("*")
+    .select("id, household_id, state, release_at")
     .eq("id", requestId)
     .single();
   if (!request) return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  const { data: canEdit } = await supabase.rpc("has_edit_grant", { hid: request.household_id });
+  if (!canEdit) return NextResponse.json({ error: "You cannot release this request" }, { status: 403 });
   if (request.state !== "waiting") {
     return NextResponse.json({ error: `This request is ${request.state}` }, { status: 409 });
   }
   if (new Date(request.release_at).getTime() > Date.now()) {
     return NextResponse.json(
-      { error: `The waiting period ends ${new Date(request.release_at).toLocaleString()}. The package cannot be generated before then.` },
+      { error: "The waiting period is not over yet. The package cannot be released before then." },
       { status: 409 }
     );
   }
@@ -41,56 +43,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Service role is not configured" }, { status: 501 });
   }
 
-  const { entries, withheld } = await buildPackageContent(service, request.household_id, request.trusted_contact_id);
-  const expires = new Date(Date.now() + 7 * 24 * 3600_000);
-  const { data: pkg, error } = await service
-    .from("disclosure_packages")
-    .insert({
-      request_id: request.id,
-      household_id: request.household_id,
-      trusted_contact_id: request.trusted_contact_id,
-      content: { entries, withheld_count: withheld, generated_at: new Date().toISOString() },
-      expires_at: expires.toISOString(),
-    })
-    .select("id, access_token, expires_at")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-
-  await service
-    .from("disclosure_requests")
-    .update({ state: "released" })
-    .eq("id", request.id);
-  await service.rpc("append_audit", {
-    p_household: request.household_id,
-    p_actor: user.id,
-    p_action: "disclosure.package_generated",
-    p_entity: "disclosure_package",
-    p_entity_id: pkg.id,
+  const result = await releaseRequest(service, request.id, { actor: user.id, requireOwnerNotified: false });
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json({
+    package_id: result.package_id,
+    access_token: result.access_token,
+    expires_at: result.expires_at,
+    contact_notified: result.contact_notified,
   });
-
-  // Email the trusted contact their package link (best-effort).
-  try {
-    const { data: tc } = await service
-      .from("trusted_contacts")
-      .select("name, email")
-      .eq("id", request.trusted_contact_id)
-      .single();
-    if (tc?.email) {
-      await sendEmail({
-        to: tc.email,
-        subject: "Your KinWillow recovery package is ready",
-        html: brandedEmail({
-          heading: "Your recovery package is ready",
-          bodyHtml:
-            `<p>${tc.name ? `${tc.name}, ` : ""}the waiting period has ended and your KinWillow recovery package has been prepared. It contains the recovery information the account owner chose to share with you — where things are and how recovery works.</p>` +
-            `<p>This link expires on <strong>${new Date(pkg.expires_at).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })}</strong>. Please open it somewhere private.</p>`,
-          ctaLabel: "Open my recovery package",
-          ctaUrl: `https://www.kinwillow.com/package/${pkg.access_token}`,
-          footnote: "KinWillow never stores passwords. This package contains recovery pointers and instructions only.",
-        }),
-      });
-    }
-  } catch { /* notification is best-effort */ }
-
-  return NextResponse.json({ package_id: pkg.id, access_token: pkg.access_token, expires_at: pkg.expires_at });
 }

@@ -27,6 +27,7 @@ export default function ItemDetailPage() {
   const params = useParams<{ id: string }>();
   const [item, setItem] = useState<InventoryItem | null>(null);
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [scopes, setScopes] = useState<Array<{ id: string; name: string }>>([]);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,6 +43,14 @@ export default function ItemDetailPage() {
       .eq("item_id", params.id)
       .order("created_at", { ascending: false });
     setDocs((d ?? []) as Doc[]);
+    if (data) {
+      const { data: sc } = await supabase
+        .from("release_scopes")
+        .select("id, name")
+        .eq("household_id", (data as InventoryItem).household_id)
+        .order("created_at");
+      setScopes((sc ?? []) as Array<{ id: string; name: string }>);
+    }
   }
   useEffect(() => {
     load();
@@ -149,6 +158,17 @@ export default function ItemDetailPage() {
         <textarea rows={4} defaultValue={item.notes ?? ""} key={`n-${item.id}`} onBlur={(e) => save("notes", e.target.value.trim() || null)} style={{ width: "100%" }} />
         <label style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>Renewal / expiry date</label>
         <input type="date" defaultValue={item.renewal_date ?? ""} key={`r-${item.id}`} onBlur={(e) => save("renewal_date", e.target.value || null)} />
+        <label htmlFor="item-scope" style={{ display: "block", fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
+          Who receives this in an emergency
+        </label>
+        <select id="item-scope" defaultValue={item.release_scope_id ?? ""} key={`s-${item.id}`} onChange={(e) => save("release_scope_id", e.target.value || null)} style={{ width: "100%" }}>
+          <option value="">Every trusted contact</option>
+          {scopes.map((s) => (<option key={s.id} value={s.id}>Only contacts with the &ldquo;{s.name}&rdquo; scope</option>))}
+        </select>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
+          This item and its documents are included in the recovery package released to a trusted
+          contact after your waiting period. Manage scopes under <Link href="/app/contacts">Contacts &amp; scopes</Link>.
+        </p>
       </div>
 
       <div className="panel sans" style={{ maxWidth: 640 }}>

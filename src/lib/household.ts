@@ -48,6 +48,7 @@ export interface InventoryItem {
   criticality: string;
   renewal_date: string | null;
   notice_days: number | null;
+  release_scope_id: string | null;
   archived: boolean;
   created_at: string;
 }

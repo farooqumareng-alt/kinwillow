@@ -25,7 +25,7 @@ export default function RequestAccessForm({ token, contactName }: { token: strin
       return;
     }
     setDone(
-      `Your request has been recorded. The account owner has been notified and can stop (veto) the release at any time during the waiting period. If it is not stopped, the recovery package can be released after ${new Date(json.release_at).toLocaleString()}.`
+      `Your request has been recorded. The account owner is being notified and can stop (veto) the release at any time during the waiting period. If it is not stopped, the recovery package will be emailed to you automatically after ${new Date(json.release_at).toLocaleString()}. You do not need to do anything else.`
     );
   }
 

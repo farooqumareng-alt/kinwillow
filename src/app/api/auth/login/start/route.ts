@@ -31,7 +31,9 @@ export async function POST(req: Request) {
     if (error || !data.user) {
       return NextResponse.json({ ok: false, error: GENERIC_CREDENTIALS_ERROR }, { status: 401 });
     }
-    await anon.auth.signOut().catch(() => {});
+    // scope "local" revokes only this throwaway session; the default ("global")
+    // would sign the user out on every other device at each sign-in attempt.
+    await anon.auth.signOut({ scope: "local" }).catch(() => {});
 
     const service = createServiceClient();
     // Rate limit: max 5 code sends per email per hour.
