@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { decryptField } from "@/lib/crypto";
+import { HOUSEHOLD_COOKIE, MEMBERSHIP_SELECT, pickHousehold, type MembershipRow } from "@/lib/household-select";
 
 // Full household export (the owner's own data, as JSON). Always available —
 // including for sealed households (spec §8.4). Export is audit-logged.
@@ -11,14 +13,16 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const { data: membership } = await supabase
+  // Export the vault the user is working in (their own unless they switched).
+  const { data: memberships } = await supabase
     .from("household_members")
-    .select("household_id")
+    .select(MEMBERSHIP_SELECT)
     .eq("user_id", user.id)
-    .limit(1)
-    .single();
-  if (!membership) return NextResponse.json({ error: "No household" }, { status: 404 });
-  const hid = membership.household_id as string;
+    .order("created_at", { ascending: true });
+  const preferred = (await cookies()).get(HOUSEHOLD_COOKIE)?.value;
+  const picked = pickHousehold((memberships ?? []) as unknown as MembershipRow[], preferred);
+  if (!picked?.households) return NextResponse.json({ error: "No household" }, { status: 404 });
+  const hid = picked.households.id;
 
   const [household, items, documents, records, contacts, scopes, requests, skips, audit] = await Promise.all([
     supabase.from("households").select("*").eq("id", hid).single(),

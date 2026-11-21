@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { HOUSEHOLD_COOKIE, MEMBERSHIP_SELECT, pickHousehold, type MembershipRow } from "@/lib/household-select";
 import { healthScore, effectiveState, type VerifiedState } from "@/lib/continuity";
 
 export const dynamic = "force-dynamic";
@@ -19,20 +21,16 @@ export default async function Dashboard() {
 
   const { data: memberships } = await supabase
     .from("household_members")
-    .select("role, household_id, households ( name, plan_tier, status, waiting_period_hours, kind )")
+    .select(MEMBERSHIP_SELECT)
     .eq("user_id", user?.id ?? "")
     .order("created_at", { ascending: true });
 
-  type Membership = {
-    role: string;
-    household_id: string;
-    households: { name: string; plan_tier: string; status: string; waiting_period_hours: number; kind: string };
-  };
-  const rows = (memberships ?? []) as unknown as Membership[];
-  // Same choice as getMyHousehold(): the user's own household first.
-  const first = rows.find((r) => r.households?.kind === "own") ?? rows[0];
-  const household = first?.households;
-  const hid = first?.household_id;
+  // Same choice as getMyHousehold(): the vault the user last switched to,
+  // otherwise their own.
+  const rows = (memberships ?? []) as unknown as MembershipRow[];
+  const preferred = (await cookies()).get(HOUSEHOLD_COOKIE)?.value;
+  const household = pickHousehold(rows, preferred)?.households ?? undefined;
+  const hid = household?.id;
 
   const { data: factors } = await supabase.auth.mfa.listFactors();
   const mfaOn = (factors?.totp ?? []).some((f) => f.status === "verified");
@@ -126,6 +124,7 @@ export default async function Dashboard() {
     <main>
       <h1 style={{ marginBottom: 6 }}>{household ? household.name : "Your vault"}</h1>
       <p className="sans muted" style={{ marginBottom: 24 }}>
+        {household?.kind === "parents" ? "Your parents’ vault · " : ""}
         Plan: {PLAN_NAMES[household?.plan_tier ?? "free"] ?? household?.plan_tier}
         {household?.status === "sealed" ? " · Sealed (read-only)" : ""} · Emergency waiting period:{" "}
         {household ? Math.round(household.waiting_period_hours / 24) : 7} days

@@ -2,43 +2,82 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getMyHousehold, type HouseholdInfo } from "@/lib/household";
+import { getMyHousehold, getOwnHousehold, type HouseholdInfo } from "@/lib/household";
 
 type Sub = { tier: string | null; status: string | null; current_period_end: string | null } | null;
 
+const PLAN_NAMES: Record<string, string> = {
+  free: "Free",
+  family: "Family — $79/year",
+  family_parents: "Family + Parents — $129/year",
+};
+
 export default function BillingPage() {
+  // Billing always belongs to the user's own household, whichever vault they
+  // happen to be working in.
   const [household, setHousehold] = useState<HouseholdInfo | null>(null);
+  const [viewingParents, setViewingParents] = useState(false);
   const [sub, setSub] = useState<Sub>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    const own = await getOwnHousehold();
+    setHousehold(own);
+    setViewingParents((await getMyHousehold())?.kind === "parents");
+    if (own) {
+      const supabase = createClient();
+      const { data } = await supabase.from("subscriptions").select("*").eq("household_id", own.id).maybeSingle();
+      setSub((data as Sub) ?? null);
+    }
+    return own;
+  }
 
   useEffect(() => {
     (async () => {
-      const h = await getMyHousehold();
-      setHousehold(h);
-      if (h) {
-        const supabase = createClient();
-        const { data } = await supabase.from("subscriptions").select("*").eq("household_id", h.id).maybeSingle();
-        setSub((data as Sub) ?? null);
-      }
+      const params = new URLSearchParams(window.location.search);
+      const own = await load();
       setLoading(false);
+      if (params.get("upgraded") === "1") {
+        setMsg("Thank you — your payment went through.");
+        // Stripe tells us about the new plan a moment after you return.
+        for (let i = 0; i < 6 && own?.plan_tier === "free"; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          if ((await load())?.plan_tier !== "free") break;
+        }
+      }
     })();
   }, []);
+
+  const hasLivePlan = Boolean(sub && ["active", "trialing", "past_due"].includes(sub.status ?? ""));
 
   async function upgrade(tier: string) {
     if (!household) return;
     setBusy(true);
     setMsg(null);
+    setError(null);
+    setConfirm(null);
     const res = await fetch("/api/billing/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ household_id: household.id, tier }),
     });
     const json = await res.json().catch(() => ({}));
+    if (res.ok && json.updated) {
+      setMsg("Your plan has been changed. It can take a few seconds to show here.");
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if ((await load())?.plan_tier === tier) break;
+      }
+      setBusy(false);
+      return;
+    }
     setBusy(false);
     if (!res.ok || !json.url) {
-      setMsg(json.error ?? "Checkout is not available yet.");
+      setError(json.error ?? "Checkout is not available yet.");
       return;
     }
     window.location.href = json.url;
@@ -47,6 +86,7 @@ export default function BillingPage() {
   async function portal() {
     if (!household) return;
     setBusy(true);
+    setError(null);
     const res = await fetch("/api/billing/portal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -55,47 +95,80 @@ export default function BillingPage() {
     const json = await res.json().catch(() => ({}));
     setBusy(false);
     if (!res.ok || !json.url) {
-      setMsg(json.error ?? "No subscription on file.");
+      setError(json.error ?? "No subscription on file.");
       return;
     }
     window.location.href = json.url;
   }
 
-  if (loading) return <main><p className="sans">Loading…</p></main>;
+  if (loading) return <main><p className="sans muted" role="status">Loading…</p></main>;
   const tier = household?.plan_tier ?? "free";
+
+  // With a live plan, switching changes the existing subscription and Stripe
+  // charges or credits the difference — so ask first.
+  const planButton = (target: string, label: string) =>
+    hasLivePlan ? (
+      confirm === target ? (
+        <div style={{ marginTop: 10 }}>
+          <p>
+            {target === "family_parents"
+              ? "Your plan changes now and your card is charged the difference for the rest of this billing year."
+              : "Your plan changes now and the unused difference is credited to your next invoice. Your parents’ vault becomes read-only."}
+          </p>
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn small" disabled={busy} onClick={() => upgrade(target)}>
+              {busy ? "Changing…" : "Confirm change"}
+            </button>
+            <button className="link-btn muted" onClick={() => setConfirm(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn" style={{ marginTop: 10 }} disabled={busy} onClick={() => setConfirm(target)}>
+          {label}
+        </button>
+      )
+    ) : (
+      <button className="btn" style={{ marginTop: 10 }} disabled={busy} onClick={() => upgrade(target)}>
+        {busy ? "Opening checkout…" : label}
+      </button>
+    );
 
   return (
     <main>
-      <h1 style={{ fontSize: 32, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 6 }}>
-        Plan &amp; billing
-      </h1>
-      <p className="sans" style={{ color: "var(--muted)", marginBottom: 24 }}>
-        Current plan: <strong>{tier === "free" ? "Free" : tier === "family" ? "Family — $79/year" : "Family + Parents — $129/year"}</strong>
-        {household?.status === "sealed" ? " · This household is sealed (read-only) because billing lapsed. Your vault is kept safe and your export is always available." : ""}
-        {sub?.current_period_end ? ` · Renews ${new Date(sub.current_period_end).toLocaleDateString()}` : ""}
+      <h1 style={{ marginBottom: 6 }}>Plan &amp; billing</h1>
+      <p className="sans muted" style={{ marginBottom: 24, maxWidth: 680 }}>
+        Current plan: <strong>{PLAN_NAMES[tier] ?? tier}</strong>
+        {sub?.current_period_end && hasLivePlan ? ` · Renews ${new Date(sub.current_period_end).toLocaleDateString(undefined, { dateStyle: "long" })}` : ""}
+        {household?.status === "sealed" ? " · Sealed (read-only) because billing lapsed. Your vault is kept safe and your export is always available." : ""}
+        {viewingParents ? " · One plan covers both your vault and your parents’." : ""}
       </p>
+
+      {msg && <div className="notice sans" role="status" style={{ marginTop: 0, marginBottom: 18 }}>{msg}</div>}
+      {error && <div className="error sans" role="alert" style={{ marginTop: 0, marginBottom: 18 }}>{error}</div>}
 
       <div className="grid">
         <div className="panel sans">
           <h3>Family — $79/year</h3>
           <p>Unlimited items, up to 5 trusted contacts, unlimited scopes.</p>
-          {tier !== "family" && tier !== "family_parents" ? (
-            <button className="btn" style={{ marginTop: 10 }} disabled={busy} onClick={() => upgrade("family")}>
-              Upgrade to Family
-            </button>
+          {tier === "family" ? (
+            <p style={{ marginTop: 10 }}><span className="chip good">Your current plan</span></p>
           ) : (
-            <p style={{ marginTop: 10 }}>Your current plan.</p>
+            planButton("family", tier === "family_parents" ? "Switch to Family" : "Upgrade to Family")
           )}
         </div>
         <div className="panel sans">
           <h3>Family + Parents — $129/year</h3>
-          <p>Everything in Family, plus a second vault for your parents, managed from your account.</p>
-          {tier !== "family_parents" ? (
-            <button className="btn" style={{ marginTop: 10 }} disabled={busy} onClick={() => upgrade("family_parents")}>
-              Upgrade to Family + Parents
-            </button>
+          <p>
+            Everything in Family, plus a second, separate vault for your parents — its own items,
+            contacts and emergency settings — managed from your account.
+          </p>
+          {tier === "family_parents" ? (
+            <p style={{ marginTop: 10 }}>
+              <span className="chip good">Your current plan</span> Set up or open your parents&rsquo;
+              vault from the box above the menu.
+            </p>
           ) : (
-            <p style={{ marginTop: 10 }}>Your current plan.</p>
+            planButton("family_parents", "Upgrade to Family + Parents")
           )}
         </div>
         <div className="panel sans">
@@ -110,7 +183,6 @@ export default function BillingPage() {
           )}
         </div>
       </div>
-      {msg && <p className="error sans" role="alert" style={{ marginTop: 16 }}>{msg}</p>}
     </main>
   );
 }

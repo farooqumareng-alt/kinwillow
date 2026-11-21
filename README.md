@@ -31,8 +31,9 @@ account deletion, activity log, read-only sealing.) Order matters:
    - `supabase/migrations/20261121000008_phase1_core.sql`
    - `supabase/migrations/20261121000010_phase2_honesty.sql`
    - `supabase/migrations/20261121000012_phase3_contacts.sql`
+   - `supabase/migrations/20261121000013_parents_household.sql`
 
-   All three are additive (new columns, guards, the `verified_sessions` table,
+   All four are additive (new columns, guards, the `verified_sessions` table,
    `session_state()`, the hardened `append_audit`, contact invitation dates).
    Do **not** run `…000011` yet — it is the enforcement switch and goes last.
 2. **Set the new Vercel env vars** (see `.env.example`):
