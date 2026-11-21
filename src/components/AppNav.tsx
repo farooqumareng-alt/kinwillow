@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/app/continuity", label: "Continuity Centre" },
   { href: "/app/contacts", label: "Contacts & scopes" },
   { href: "/app/emergency", label: "Emergency" },
+  { href: "/app/review", label: "Annual review" },
   { href: "/app/activity", label: "Activity log" },
   { href: "/app/billing", label: "Billing" },
   { href: "/app/settings", label: "Settings" },

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { HOUSEHOLD_COOKIE, MEMBERSHIP_SELECT, pickHousehold, type MembershipRow } from "@/lib/household-select";
 import { healthScore, effectiveState, type VerifiedState } from "@/lib/continuity";
+import { reviewCutoff } from "@/lib/review";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export default async function Dashboard() {
   let readinessScore: number | null = null;
   let attentionCount = 0;
   let upcoming: Array<{ id: string; title: string; renewal_date: string }> = [];
+  let reviewDue = 0;
   if (hid) {
     const today = new Date().toISOString().slice(0, 10);
     const in60 = new Date(Date.now() + 60 * 24 * 3600_000).toISOString().slice(0, 10);
@@ -62,6 +64,15 @@ export default async function Dashboard() {
         .order("renewal_date", { ascending: true })
         .limit(5),
     ]);
+    // Counted separately: the column arrives with migration 000015, and a
+    // missing column must not blank the rest of the dashboard.
+    const stale = await supabase
+      .from("inventory_items")
+      .select("id", { count: "exact", head: true })
+      .eq("household_id", hid)
+      .eq("archived", false)
+      .lt("reviewed_at", reviewCutoff().toISOString());
+    reviewDue = stale.error ? 0 : stale.count ?? 0;
     const itemRows = (items.data ?? []) as Array<{ section: number | null }>;
     itemCount = itemRows.length;
     sectionsStarted = new Set(itemRows.map((r) => r.section).filter((s) => s != null)).size;
@@ -152,6 +163,15 @@ export default async function Dashboard() {
           <Link className="btn" href={nextStep.href} style={{ marginTop: 16 }}>
             {nextStep.cta}
           </Link>
+        </div>
+      )}
+
+      {reviewDue > 0 && (
+        <div className="notice sans" style={{ marginTop: 0, marginBottom: 24 }}>
+          <strong>
+            {reviewDue} item{reviewDue === 1 ? " hasn’t" : "s haven’t"} been confirmed in over a year.
+          </strong>{" "}
+          A quick look keeps your vault true. <Link href="/app/review">Start the annual review</Link>
         </div>
       )}
 

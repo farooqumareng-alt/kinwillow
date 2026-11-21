@@ -99,9 +99,10 @@ export default function SettingsPage() {
             requests and your activity log. Always available, even if billing lapses. Uploaded
             files themselves are downloaded from each item.
           </p>
-          <a className="btn" style={{ marginTop: 10, display: "inline-block" }} href="/api/export">
-            Download my export
-          </a>
+          <div className="row" style={{ marginTop: 10 }}>
+            <a className="btn" href="/api/export">Download my export</a>
+            <a className="btn secondary" href="/app/print">Print a paper copy</a>
+          </div>
         </div>
         <div className="panel sans">
           <h3>Security</h3>

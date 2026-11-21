@@ -20,16 +20,42 @@ export default async function AdminOverview() {
   }
   const { service } = ctx;
 
-  const [profiles, households, signups, messages, disclosures, audit] = await Promise.all([
+  const [profiles, households, signups, messages, disclosures, audit, itemRows, contactRows] = await Promise.all([
     service.from("profiles").select("user_id", { count: "exact", head: true }),
-    service.from("households").select("plan_tier, status"),
+    service.from("households").select("id, plan_tier, status, kind"),
     service.from("signups").select("id", { count: "exact", head: true }),
     service.from("messages").select("id, read_at"),
     service.from("disclosure_requests").select("state"),
     service.from("audit_log").select("household_id, prev_hash, entry_hash, created_at").order("created_at", { ascending: true }).limit(2000),
+    // Household ids only — counts, never contents.
+    service.from("inventory_items").select("household_id").eq("archived", false).limit(50000),
+    service.from("trusted_contacts").select("household_id, status, invited_at").neq("status", "removed").limit(50000),
   ]);
 
-  const hh = (households.data ?? []) as Array<{ plan_tier: string; status: string }>;
+  const hh = (households.data ?? []) as Array<{ id: string; plan_tier: string; status: string; kind: string }>;
+
+  // Activation funnel, computed from what already exists (no tracking):
+  // checklist signup → account → first item → ten items → contact named →
+  // contact told → paid. Parents' vaults are left out so each customer counts once.
+  const ownIds = new Set(hh.filter((h) => h.kind !== "parents").map((h) => h.id));
+  const itemCounts = countBy(
+    ((itemRows.data ?? []) as Array<{ household_id: string }>).filter((r) => ownIds.has(r.household_id)),
+    (r) => r.household_id
+  );
+  const contactList = ((contactRows.data ?? []) as Array<{ household_id: string; status: string; invited_at: string | null }>).filter(
+    (c) => ownIds.has(c.household_id)
+  );
+  const accounts = ownIds.size;
+  const funnel: Array<[string, number]> = [
+    ["Checklist signups", signups.count ?? 0],
+    ["Accounts created", accounts],
+    ["Added a first item", Object.keys(itemCounts).length],
+    ["Reached 10 items", Object.values(itemCounts).filter((n) => n >= 10).length],
+    ["Named a trusted contact", new Set(contactList.map((c) => c.household_id)).size],
+    ["Contact has their link", new Set(contactList.filter((c) => c.status === "accepted" || c.invited_at).map((c) => c.household_id)).size],
+    ["On a paid plan", hh.filter((h) => h.kind !== "parents" && h.plan_tier !== "free").length],
+  ];
+  const pct = (n: number) => (accounts > 0 ? ` (${Math.round((n / accounts) * 100)}% of accounts)` : "");
   const byTier = countBy(hh, (h) => h.plan_tier);
   const byStatus = countBy(hh, (h) => h.status);
   const unread = ((messages.data ?? []) as Array<{ read_at: string | null }>).filter((m) => !m.read_at).length;
@@ -71,9 +97,16 @@ export default async function AdminOverview() {
           <p>By status: {Object.entries(byStatus).map(([k, v]) => `${k} ${v}`).join(" · ") || "—"}</p>
         </div>
         <div className="panel sans">
-          <h3>Funnel</h3>
-          <p><strong>{signups.count ?? 0}</strong> checklist signups</p>
-          <p><strong>{unread}</strong> unread contact messages</p>
+          <h3>Activation funnel</h3>
+          <ol style={{ paddingLeft: 20, fontSize: 15 }}>
+            {funnel.map(([label, n], i) => (
+              <li key={label} style={{ padding: "2px 0" }}>
+                {label}: <strong>{n}</strong>
+                {i >= 2 ? pct(n) : ""}
+              </li>
+            ))}
+          </ol>
+          <p style={{ marginTop: 8 }}><strong>{unread}</strong> unread contact messages</p>
         </div>
         <div className="panel sans">
           <h3>Disclosure requests</h3>

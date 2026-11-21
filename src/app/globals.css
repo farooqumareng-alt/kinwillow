@@ -177,3 +177,21 @@ nav.site span{margin-left:0 !important}
   .signup-block{padding:36px 6%}
 }
 @media (prefers-reduced-motion:no-preference){.btn,.link-btn{transition:background-color .12s ease}}
+
+/* ---------- Printable binder ---------- */
+.binder{max-width:820px}
+.binder-section{margin-top:26px}
+.binder-section h2{font-size:21px;text-align:left;border-bottom:2px solid var(--accent);padding-bottom:4px;margin-bottom:10px}
+.binder-section ul{padding-left:20px}
+.binder-item{padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;line-height:1.5;break-inside:avoid}
+@media print{
+  header.site,footer.site,.app-sidebar,.no-print,.notice,.error{display:none !important}
+  body{background:#fff;color:#000;font-size:11.5pt}
+  .app-shell,.app-shell--sidebar{display:block;max-width:none;padding:0;margin:0}
+  .app-content h1{font-size:22pt}
+  .binder{max-width:none}
+  .binder-section h2{break-after:avoid}
+  a{color:#000;text-decoration:none}
+  .muted{color:#444 !important}
+  @page{margin:18mm 16mm}
+}
