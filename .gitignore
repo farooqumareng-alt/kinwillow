@@ -6,3 +6,11 @@ tsconfig.tsbuildinfo
 # Market research output: kept on disk, not published with the code.
 research_notes/
 reports/
+
+# Android: only twa-manifest.json and README.md are source; the rest is generated or secret.
+android/*
+!android/twa-manifest.json
+!android/README.md
+*.p12
+*.keystore
+*.jks
