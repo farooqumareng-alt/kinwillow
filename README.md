@@ -30,9 +30,11 @@ account deletion, activity log, read-only sealing.) Order matters:
 1. **Run, in the Supabase SQL editor, in this order:**
    - `supabase/migrations/20261121000008_phase1_core.sql`
    - `supabase/migrations/20261121000010_phase2_honesty.sql`
+   - `supabase/migrations/20261121000012_phase3_contacts.sql`
 
-   Both are additive (new columns, guards, the `verified_sessions` table,
-   `session_state()`, the hardened `append_audit`). Do **not** run `…000011` yet.
+   All three are additive (new columns, guards, the `verified_sessions` table,
+   `session_state()`, the hardened `append_audit`, contact invitation dates).
+   Do **not** run `…000011` yet — it is the enforcement switch and goes last.
 2. **Set the new Vercel env vars** (see `.env.example`):
    - `CRON_SECRET` — any long random string. Without it the scheduled jobs
      refuse to run: nothing is auto-released, no reminders go out and no

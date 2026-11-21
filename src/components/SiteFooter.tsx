@@ -1,10 +1,21 @@
 import Link from "next/link";
+import { isCalmPage } from "@/components/SiteHeader";
 
-export default function SiteFooter() {
+export default async function SiteFooter() {
+  if (await isCalmPage()) {
+    return (
+      <footer className="site calm sans">
+        <p>
+          KinWillow is not a law firm and does not provide legal advice. Need help with this page?{" "}
+          <Link href="/contact">Contact us</Link>.
+        </p>
+      </footer>
+    );
+  }
   return (
     <footer className="site sans">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-symbol.png" alt="KinWillow" style={{ height: 58, width: "auto", marginBottom: 10 }} />
+      <img src="/logo-symbol.png" alt="" style={{ height: 58, width: "auto", marginBottom: 10 }} />
       <p>
         <strong>KinWillow</strong> · Everything your family would need, in one safe place.
       </p>

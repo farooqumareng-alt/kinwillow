@@ -5,6 +5,10 @@ import type { SessionState } from "@/lib/session";
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 export async function updateSession(request: NextRequest) {
+  // Let server components know which page is being rendered (the header and
+  // footer drop their marketing links on the trusted-contact pages). Set on
+  // the request, overwriting anything a client sent under this name.
+  request.headers.set("x-kw-path", request.nextUrl.pathname);
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

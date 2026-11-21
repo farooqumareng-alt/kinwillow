@@ -1,30 +1,11 @@
-import Link from "next/link";
+import AppNav from "@/components/AppNav";
 import AppSessionGuard from "@/components/AppSessionGuard";
-
-const LINKS = [
-  { href: "/app", label: "Dashboard" },
-  { href: "/app/setup", label: "Guided setup" },
-  { href: "/app/inventory", label: "Your vault" },
-  { href: "/app/continuity", label: "Continuity Centre" },
-  { href: "/app/contacts", label: "Contacts & scopes" },
-  { href: "/app/emergency", label: "Emergency" },
-  { href: "/app/activity", label: "Activity log" },
-  { href: "/app/billing", label: "Billing" },
-  { href: "/app/settings", label: "Settings" },
-  { href: "/app/security", label: "Security" },
-];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell app-shell--sidebar">
       <aside className="app-sidebar sans">
-        <nav className="app-nav app-nav--sidebar" aria-label="Vault menu">
-          {LINKS.map((l) => (
-            <Link key={l.href} href={l.href}>
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+        <AppNav />
       </aside>
       <div className="app-content">
         <AppSessionGuard />

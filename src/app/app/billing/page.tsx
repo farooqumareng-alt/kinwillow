@@ -19,7 +19,7 @@ export default function BillingPage() {
       setHousehold(h);
       if (h) {
         const supabase = createClient();
-        const { data } = await supabase.from("subscriptions").select("*").eq("household_id", h.id).single();
+        const { data } = await supabase.from("subscriptions").select("*").eq("household_id", h.id).maybeSingle();
         setSub((data as Sub) ?? null);
       }
       setLoading(false);
@@ -101,12 +101,16 @@ export default function BillingPage() {
         <div className="panel sans">
           <h3>Manage subscription</h3>
           <p>Update your card, see invoices, or cancel — handled securely by Stripe.</p>
-          <button className="btn secondary" style={{ marginTop: 10 }} disabled={busy} onClick={portal}>
-            Open billing portal
-          </button>
+          {sub ? (
+            <button className="btn secondary" style={{ marginTop: 10 }} disabled={busy} onClick={portal}>
+              Open billing portal
+            </button>
+          ) : (
+            <p style={{ marginTop: 10 }}>You have no paid subscription yet, so there is nothing to manage.</p>
+          )}
         </div>
       </div>
-      {msg && <p className="error sans" style={{ marginTop: 16 }}>{msg}</p>}
+      {msg && <p className="error sans" role="alert" style={{ marginTop: 16 }}>{msg}</p>}
     </main>
   );
 }
