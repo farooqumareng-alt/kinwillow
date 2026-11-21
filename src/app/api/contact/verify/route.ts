@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { clientIp, withinLimits, tooManyRequests, MINUTE } from "@/lib/rate-limit";
 
 // Contact form step 2 — ported from the Stage 1 serverless function.
 // Verifies the 6-digit code; on success the message moves to `messages`,
@@ -15,6 +16,9 @@ export async function POST(req: Request) {
     const code = String(body?.code || "").trim();
     if (!/^\d{6}$/.test(code) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       return NextResponse.json({ ok: false, error: "Enter the 6-digit code from your email." }, { status: 400 });
+    }
+    if (!(await withinLimits([{ action: "contact-verify:ip", subject: clientIp(req), limit: 20, windowSeconds: 10 * MINUTE }]))) {
+      return tooManyRequests();
     }
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -41,7 +45,10 @@ export async function POST(req: Request) {
     if (pending.attempts >= 5) {
       return NextResponse.json({ ok: false, error: "Too many attempts — please submit the form again for a fresh code." }, { status: 429 });
     }
-    if (pending.code_hash !== hashCode(code, cleanEmail)) {
+    // Constant-time comparison of the two hex digests.
+    const given = Buffer.from(hashCode(code, cleanEmail));
+    const expected = Buffer.from(String(pending.code_hash));
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
       await fetch(`${supabaseUrl}/rest/v1/contact_pending?id=eq.${pending.id}`, {
         method: "PATCH",
         headers: { ...sb, Prefer: "return=minimal" },

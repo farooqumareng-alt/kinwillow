@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { brandedEmail, sendEmail } from "@/lib/email";
 import { generateLoginCode, hashLoginCode } from "@/lib/login-code";
+import { clientIp, withinLimits, tooManyRequests, MINUTE } from "@/lib/rate-limit";
 
 // Login step 1: check email + password, then email a 6-digit code. No
 // session is created here — the session only exists after the code is
@@ -18,6 +19,13 @@ export async function POST(req: Request) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || !cleanPassword) {
       return NextResponse.json({ ok: false, error: GENERIC_CREDENTIALS_ERROR }, { status: 401 });
     }
+    // This step answers "is this password right?", so slow down guessing —
+    // per caller, and per account whatever address the guesses come from.
+    const allowed = await withinLimits([
+      { action: "login:ip", subject: clientIp(req), limit: 20, windowSeconds: 10 * MINUTE },
+      { action: "login:email", subject: cleanEmail, limit: 10, windowSeconds: 10 * MINUTE },
+    ]);
+    if (!allowed) return tooManyRequests("Too many sign-in attempts. Please wait ten minutes and try again.");
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anonKey) {

@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { hashLoginCode, hashEquals } from "@/lib/login-code";
 import { markSessionVerified } from "@/lib/session";
+import { clientIp, withinLimits, tooManyRequests, MINUTE } from "@/lib/rate-limit";
 
 // Login step 2: verify the 6-digit code, then — and only then — establish
 // the real session. Errors are deliberately generic: the response never
@@ -19,6 +20,11 @@ export async function POST(req: Request) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || !cleanPassword || !/^\d{6}$/.test(cleanCode)) {
       return NextResponse.json({ ok: false, error: GENERIC_CODE_ERROR }, { status: 400 });
     }
+    const allowed = await withinLimits([
+      { action: "login-verify:ip", subject: clientIp(req), limit: 30, windowSeconds: 10 * MINUTE },
+      { action: "login-verify:email", subject: cleanEmail, limit: 15, windowSeconds: 10 * MINUTE },
+    ]);
+    if (!allowed) return tooManyRequests("Too many attempts. Please wait ten minutes and sign in again.");
     const service = createServiceClient();
     const nowIso = new Date().toISOString();
     const { data: rows } = await service

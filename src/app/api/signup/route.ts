@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { brandedEmail, sendEmail } from "@/lib/email";
+import { brandedEmail, escapeHtml, sendEmail, siteUrl } from "@/lib/email";
+import { clientIp, withinLimits, tooManyRequests, HOUR, DAY } from "@/lib/rate-limit";
 
 // Checklist signup capture — ported from the Stage 1 serverless function.
 // Stores the email in Supabase (signups), then best-effort emails the
@@ -9,6 +10,14 @@ export async function POST(req: Request) {
   const email = String(body?.email || "").trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+  }
+  if (!(await withinLimits([{ action: "signup:ip", subject: clientIp(req), limit: 5, windowSeconds: HOUR }]))) {
+    return tooManyRequests();
+  }
+  // One checklist email per address per day: a repeat submission is answered
+  // as a success (the checklist is on its way) without sending it again.
+  if (!(await withinLimits([{ action: "signup:email", subject: email, limit: 1, windowSeconds: DAY }]))) {
+    return NextResponse.json({ ok: true });
   }
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,7 +40,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not reach signup storage" }, { status: 502 });
   }
 
-  const checklistUrl = "https://www.kinwillow.com/Family-Continuity-Checklist.pdf";
+  const checklistUrl = `${siteUrl()}/Family-Continuity-Checklist.pdf`;
   await sendEmail({
     to: email,
     subject: "Your Family Continuity Checklist — from KinWillow",
@@ -49,7 +58,7 @@ export async function POST(req: Request) {
     await sendEmail({
       to: process.env.NOTIFY_EMAIL,
       subject: "New KinWillow checklist signup",
-      html: brandedEmail({ heading: "New checklist signup", bodyHtml: `<p>New founding-list signup: <strong>${email}</strong></p>` }),
+      html: brandedEmail({ heading: "New checklist signup", bodyHtml: `<p>New founding-list signup: <strong>${escapeHtml(email)}</strong></p>` }),
     });
   }
   return NextResponse.json({ ok: true });

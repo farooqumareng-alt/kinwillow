@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { clientIp, withinLimits, tooManyRequests, MINUTE } from "@/lib/rate-limit";
 
 // Login step 3 (only when an authenticator app is switched on): verify the
 // 6-digit authenticator code and raise the session to AAL2. Supabase rate
@@ -10,6 +11,9 @@ export async function POST(req: Request) {
     const cleanCode = String(code || "").replace(/\s/g, "");
     if (!/^\d{6}$/.test(cleanCode)) {
       return NextResponse.json({ ok: false, error: "Enter the 6-digit code from your authenticator app." }, { status: 400 });
+    }
+    if (!(await withinLimits([{ action: "login-mfa:ip", subject: clientIp(req), limit: 20, windowSeconds: 10 * MINUTE }]))) {
+      return tooManyRequests();
     }
     const supabase = await createClient();
     const {

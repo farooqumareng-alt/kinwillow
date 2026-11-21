@@ -17,10 +17,31 @@ npm run dev
 ## Checks
 
 ```bash
+npm run lint        # ESLint (Next.js rules)
 npm run typecheck   # TypeScript
-npm test            # release, package and scheduled-job tests
+npm test            # release, package, reminders and household tests
 npm run build
 ```
+
+The same four run in GitHub Actions on every pull request and on pushes to
+`main` (`.github/workflows/ci.yml`). Once it has run once, the "Lint, types,
+tests, build" check can be made required in the branch protection settings.
+
+Server errors are written to the Vercel log as one JSON line each
+(`src/instrumentation.ts`); the reference shown on the error page is the
+`digest` to search for.
+
+## Migrations added by the safety-net change
+
+Run both in the Supabase SQL editor; neither depends on deploy order:
+
+- `supabase/migrations/20261109000000_stage1_tables.sql` — records the three
+  Stage 1 tables and **switches row-level security on** for them. If it was
+  off, anyone with the public anon key could read contact messages and signup
+  addresses.
+- `supabase/migrations/20261121000014_rate_limits.sql` — the rate limiter for
+  the public forms and sign-in. Until it is run the app logs
+  `is not being limited` and lets requests through.
 
 ## Deploying the Phase 1 + 2 changes
 
