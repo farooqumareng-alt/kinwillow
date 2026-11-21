@@ -39,6 +39,9 @@ Run both in the Supabase SQL editor; neither depends on deploy order:
   Stage 1 tables and **switches row-level security on** for them. If it was
   off, anyone with the public anon key could read contact messages and signup
   addresses.
+- `supabase/migrations/20261121000015_annual_review.sql` — adds the
+  "last confirmed" date behind the Annual review page and its reminder email.
+  Until it is run that page says it is not available yet.
 - `supabase/migrations/20261121000014_rate_limits.sql` — the rate limiter for
   the public forms and sign-in. Until it is run the app logs
   `is not being limited` and lets requests through.

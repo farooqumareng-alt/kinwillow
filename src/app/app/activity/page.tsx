@@ -14,6 +14,8 @@ const LABELS: Record<string, string> = {
   "disclosure.package_accessed": "A trusted contact opened their recovery package",
   "disclosure.document_downloaded": "A trusted contact downloaded a document from their package",
   "household.exported": "The vault was exported",
+  "household.printed": "The printable binder was opened",
+  "household.created": "This vault was created",
   "continuity.recovery_path_revealed": "Recovery instructions were viewed",
   "continuity.key_location_revealed": "An access-key location was viewed",
 };

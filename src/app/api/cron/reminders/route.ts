@@ -4,6 +4,7 @@ import { cronAuthorized } from "@/lib/cron";
 import { brandedEmail, escapeHtml, sendEmail, siteUrl } from "@/lib/email";
 import { ownerEmail } from "@/lib/release";
 import { deleteAccount, DELETION_GRACE_DAYS } from "@/lib/account";
+import { REVIEW_REMINDER_EVERY_DAYS, reviewCutoff } from "@/lib/review";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,7 +13,8 @@ export const maxDuration = 60;
 //   1. renewal reminders — one digest per household for items whose renewal
 //      or expiry date is coming up (early notice, then a 7-day notice);
 //   2. re-check reminders — legacy settings whose re-check date is near;
-//   3. account deletions whose 30-day grace period has ended.
+//   3. account deletions whose 30-day grace period has ended;
+//   4. an annual-review nudge when items have gone a year unconfirmed.
 const DEFAULT_NOTICE_DAYS = 30;
 const FINAL_NOTICE_DAYS = 7;
 const RECHECK_NOTICE_DAYS = 14;
@@ -63,7 +65,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Service role is not configured" }, { status: 501 });
   }
 
-  const summary = { reminder_emails: 0, reminder_email_failures: 0, accounts_deleted: 0, deletion_failures: 0 };
+  const summary = {
+    reminder_emails: 0,
+    reminder_email_failures: 0,
+    review_emails: 0,
+    accounts_deleted: 0,
+    deletion_failures: 0,
+  };
   const now = new Date();
   const today = dateOnly(now);
 
@@ -164,6 +172,56 @@ export async function GET(req: Request) {
     } catch (err) {
       summary.reminder_email_failures++;
       console.error(`[cron] reminders for household ${householdId} failed`, err);
+    }
+  }
+
+  // ----- annual review: items nobody has confirmed for a year -----
+  const { data: staleRows, error: staleError } = await service
+    .from("inventory_items")
+    .select("household_id")
+    .eq("archived", false)
+    .lt("reviewed_at", reviewCutoff(now).toISOString());
+  if (staleError) {
+    console.error("[cron] could not read review dates (has migration 000015 been run?)", staleError.message);
+  }
+  const staleByHousehold = new Map<string, number>();
+  for (const r of (staleRows ?? []) as Array<{ household_id: string }>) {
+    staleByHousehold.set(r.household_id, (staleByHousehold.get(r.household_id) ?? 0) + 1);
+  }
+  const remindAgainBefore = new Date(now.getTime() - REVIEW_REMINDER_EVERY_DAYS * DAY).toISOString();
+  for (const [householdId, count] of staleByHousehold) {
+    try {
+      const { data: household } = await service
+        .from("households")
+        .select("status, review_reminded_at")
+        .eq("id", householdId)
+        .single();
+      if (!household || household.status !== "active") continue;
+      if (household.review_reminded_at && household.review_reminded_at > remindAgainBefore) continue;
+      const to = await ownerEmail(service, householdId);
+      if (!to) continue;
+      const sent = await sendEmail({
+        to,
+        subject: "Time for a quick look over your KinWillow vault",
+        html: brandedEmail({
+          heading: "Is your vault still true?",
+          bodyHtml:
+            `<p>${count} item${count === 1 ? " in your vault hasn't" : "s in your vault haven't"} been confirmed or changed in over a year.</p>` +
+            "<p>Accounts close, policies move and boxes get reorganised. A few minutes confirming what is still correct means your family can rely on what they find.</p>",
+          ctaLabel: "Start the annual review",
+          ctaUrl: `${siteUrl()}/app/review`,
+          footnote: "We send this at most once every three months, and only while something is due.",
+        }),
+      });
+      if (!sent) {
+        summary.reminder_email_failures++;
+        continue;
+      }
+      summary.review_emails++;
+      await service.from("households").update({ review_reminded_at: now.toISOString() }).eq("id", householdId);
+    } catch (err) {
+      summary.reminder_email_failures++;
+      console.error(`[cron] review reminder for household ${householdId} failed`, err);
     }
   }
 

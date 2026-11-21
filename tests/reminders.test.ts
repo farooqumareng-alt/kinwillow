@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as runReminders } from "@/app/api/cron/reminders/route";
 import { healthScore } from "@/lib/continuity";
+import { agoPhrase, isDueForReview } from "@/lib/review";
 import { FakeDb } from "./fake-supabase";
 
 const HOUSEHOLD = "11111111-1111-4111-8111-111111111111";
@@ -118,6 +119,49 @@ describe("renewal reminders", () => {
     expect(await call()).toMatchObject({ reminder_emails: 1 });
     expect(sent[0].html).toContain("Apple");
     expect(await call()).toMatchObject({ reminder_emails: 0 });
+  });
+});
+
+describe("annual review", () => {
+  const longAgo = new Date(Date.now() - 400 * DAY).toISOString();
+  const recent = new Date(Date.now() - 20 * DAY).toISOString();
+  const addReviewed = (id: string, reviewed_at: string) =>
+    db.tables.inventory_items.push({
+      id,
+      household_id: HOUSEHOLD,
+      title: id,
+      renewal_date: null,
+      renewal_reminder_stage: 0,
+      archived: false,
+      reviewed_at,
+    });
+
+  it("judges an item due after a year, and describes its age", () => {
+    expect(isDueForReview(longAgo)).toBe(true);
+    expect(isDueForReview(recent)).toBe(false);
+    expect(isDueForReview(null)).toBe(true);
+    expect(agoPhrase(longAgo)).toBe("over a year ago");
+    expect(agoPhrase(recent)).toBe("20 days ago");
+  });
+
+  it("nudges once when items are a year unconfirmed, then waits three months", async () => {
+    addReviewed("old-1", longAgo);
+    addReviewed("old-2", longAgo);
+    addReviewed("fresh", recent);
+    expect(await call()).toMatchObject({ review_emails: 1 });
+    expect(sent[0].html).toContain("2 items");
+    expect(await call()).toMatchObject({ review_emails: 0 });
+
+    db.tables.households[0].review_reminded_at = new Date(Date.now() - 100 * DAY).toISOString();
+    expect(await call()).toMatchObject({ review_emails: 1 });
+  });
+
+  it("stays quiet when everything is current, and for a sealed vault", async () => {
+    addReviewed("fresh", recent);
+    expect(await call()).toMatchObject({ review_emails: 0 });
+    addReviewed("old", longAgo);
+    db.tables.households[0].status = "sealed";
+    expect(await call()).toMatchObject({ review_emails: 0 });
   });
 });
 
