@@ -1,4 +1,6 @@
-import { requireAdmin } from "@/lib/admin";
+import { staffGate } from "@/lib/admin";
+import { can } from "@/lib/staff";
+import { AdminBlocked, AdminHeader } from "@/components/AdminShell";
 
 export const dynamic = "force-dynamic";
 
@@ -9,15 +11,9 @@ function countBy<T>(rows: T[], key: (r: T) => string): Record<string, number> {
 }
 
 export default async function AdminOverview() {
-  const ctx = await requireAdmin();
-  if (!ctx) {
-    return (
-      <main className="narrow">
-        <h1 style={{ fontSize: 28, color: "var(--green-dark)", fontWeight: "normal" }}>Not available</h1>
-        <p className="sans">This page is not available.</p>
-      </main>
-    );
-  }
+  const ctx = await staffGate();
+  if (ctx.status !== "ok") return <AdminBlocked gate={ctx} />;
+  if (!can(ctx.role, "dashboard.view")) return <AdminBlocked gate={{ status: "no_permission" }} />;
   const { service } = ctx;
 
   const [profiles, households, signups, messages, disclosures, audit, itemRows, contactRows] = await Promise.all([
@@ -76,17 +72,7 @@ export default async function AdminOverview() {
 
   return (
     <main>
-      <h1 style={{ fontSize: 32, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 6 }}>
-        KinWillow Admin
-      </h1>
-      <p className="sans" style={{ color: "var(--muted)", marginBottom: 24 }}>
-        Metadata only — vault contents are never shown here. Signed in as {ctx.email}.
-      </p>
-      <nav className="app-nav sans" style={{ marginBottom: 24 }}>
-        <a href="/admin">Overview</a>
-        <a href="/admin/households">Users & households</a>
-        <a href="/admin/inbox">Inbox</a>
-      </nav>
+      <AdminHeader ctx={ctx} title="KinWillow staff" />
 
       <div className="grid">
         <div className="panel sans">

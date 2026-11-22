@@ -1,17 +1,14 @@
-import { requireAdmin } from "@/lib/admin";
+import { staffGate } from "@/lib/admin";
+import { can } from "@/lib/staff";
+import { AdminBlocked, AdminHeader } from "@/components/AdminShell";
 import InboxList, { type InboxItem } from "@/components/InboxList";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminInbox() {
-  const ctx = await requireAdmin();
-  if (!ctx) {
-    return (
-      <main className="narrow">
-        <h1 style={{ fontSize: 28, color: "var(--green-dark)", fontWeight: "normal" }}>Not available</h1>
-      </main>
-    );
-  }
+  const ctx = await staffGate();
+  if (ctx.status !== "ok") return <AdminBlocked gate={ctx} />;
+  if (!can(ctx.role, "inbox.manage")) return <AdminBlocked gate={{ status: "no_permission" }} />;
   const { service } = ctx;
   const { data: messages } = await service
     .from("messages")
@@ -47,14 +44,7 @@ export default async function AdminInbox() {
 
   return (
     <main>
-      <h1 style={{ fontSize: 32, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 6 }}>
-        Inbox
-      </h1>
-      <nav className="app-nav sans" style={{ marginBottom: 24 }}>
-        <a href="/admin">Overview</a>
-        <a href="/admin/households">Users & households</a>
-        <a href="/admin/inbox">Inbox</a>
-      </nav>
+      <AdminHeader ctx={ctx} title="Inbox" />
       <InboxList items={items} />
     </main>
   );

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { brandedEmail, sendEmail, siteUrl } from "@/lib/email";
+import { sendPasswordResetEmail } from "@/lib/auth-emails";
 import { clientIp, withinLimits, tooManyRequests, HOUR } from "@/lib/rate-limit";
 
 // Password reset, step 1 (POST { email }): send the recovery email. The
@@ -25,30 +24,7 @@ export async function POST(req: Request) {
     // Make the one-time link ourselves and send it through our own sender,
     // rather than Supabase's built-in mailer. An address with no account
     // returns an error here and nothing is sent.
-    const service = createServiceClient();
-    const { data, error } = await service.auth.admin.generateLink({ type: "recovery", email: cleanEmail });
-    const tokenHash = data?.properties?.hashed_token;
-    if (!error && tokenHash) {
-      const link = `${siteUrl()}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`;
-      const sent = await sendEmail({
-        to: cleanEmail,
-        from: "KinWillow <no-reply@kinwillow.com>",
-        subject: "Reset your KinWillow password",
-        html: brandedEmail({
-          heading: "Reset your KinWillow password",
-          bodyHtml: "<p>We received a request to reset the password for your KinWillow vault.</p>",
-          ctaLabel: "Choose a new password",
-          ctaUrl: link,
-          footnote:
-            "The button works once and expires soon. If you didn't ask for this, you can ignore this email — your password has not changed.",
-        }),
-        text:
-          "We received a request to reset the password for your KinWillow vault. Choose a new one here:\n\n" +
-          `${link}\n\n` +
-          "The link works once and expires soon. If you didn't ask for this, you can ignore this email.\n",
-      });
-      if (!sent) console.error("[auth] password reset email was not sent");
-    }
+    await sendPasswordResetEmail(cleanEmail);
   }
   return NextResponse.json({ ok: true });
 }

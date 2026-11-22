@@ -1,17 +1,14 @@
-import { requireAdmin } from "@/lib/admin";
+import { staffGate } from "@/lib/admin";
+import { can } from "@/lib/staff";
+import { AdminBlocked, AdminHeader } from "@/components/AdminShell";
 import HouseholdActions, { type HouseholdRow } from "@/components/HouseholdActions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHouseholds() {
-  const ctx = await requireAdmin();
-  if (!ctx) {
-    return (
-      <main className="narrow">
-        <h1 style={{ fontSize: 28, color: "var(--green-dark)", fontWeight: "normal" }}>Not available</h1>
-      </main>
-    );
-  }
+  const ctx = await staffGate();
+  if (ctx.status !== "ok") return <AdminBlocked gate={ctx} />;
+  if (!can(ctx.role, "accounts.view")) return <AdminBlocked gate={{ status: "no_permission" }} />;
   const { service } = ctx;
   const { data: households } = await service
     .from("households")
@@ -38,15 +35,8 @@ export default async function AdminHouseholds() {
 
   return (
     <main>
-      <h1 style={{ fontSize: 32, color: "var(--green-dark)", fontWeight: "normal", marginBottom: 6 }}>
-        Users &amp; households
-      </h1>
-      <nav className="app-nav sans" style={{ marginBottom: 24 }}>
-        <a href="/admin">Overview</a>
-        <a href="/admin/households">Users & households</a>
-        <a href="/admin/inbox">Inbox</a>
-      </nav>
-      <HouseholdActions rows={rows} />
+      <AdminHeader ctx={ctx} title="Households" />
+      <HouseholdActions rows={rows} canBilling={can(ctx.role, "billing.manage")} canPartners={can(ctx.role, "partners.manage")} />
     </main>
   );
 }
