@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@/lib/errors";
+import { suggestEmail } from "@/lib/email-typo";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -23,6 +25,8 @@ export default function SignupPage() {
     }
   }, []);
 
+  const suggestion = suggestEmail(email);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -37,7 +41,7 @@ export default function SignupPage() {
       },
     });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error.message));
       setBusy(false);
       return;
     }
@@ -69,6 +73,19 @@ export default function SignupPage() {
         <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
         <label htmlFor="email">Email</label>
         <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+        {suggestion && (
+          <p role="status" style={{ fontSize: 14, marginTop: 8 }}>
+            Did you mean{" "}
+            <button
+              type="button"
+              onClick={() => setEmail(suggestion)}
+              style={{ background: "none", border: 0, padding: 0, font: "inherit", color: "var(--green-dark)", textDecoration: "underline", cursor: "pointer" }}
+            >
+              {suggestion}
+            </button>
+            ? Your sign-in codes are sent to this address.
+          </p>
+        )}
         <label htmlFor="password">Password</label>
         <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" minLength={10} />
         <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>

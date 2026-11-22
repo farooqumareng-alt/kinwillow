@@ -17,6 +17,18 @@ export function friendlyError(message: string | null | undefined): string {
   if (/can only be vetoed while it is waiting/i.test(m)) {
     return "This request is no longer waiting, so it can't be vetoed. Refresh to see its current state.";
   }
+  if (/Error sending (confirmation|recovery|magic link) email/i.test(m)) {
+    return "We couldn't send an email to that address. Check it for typos and try again. No account was created.";
+  }
+  if (/already registered|already been registered/i.test(m)) {
+    return "There's already an account for that email. Sign in instead, or reset your password if you've forgotten it.";
+  }
+  if (/rate limit|only request this after|too many requests/i.test(m)) {
+    return "Too many attempts in a short time. Please wait a minute and try again.";
+  }
+  if (/invalid format|invalid email|is invalid/i.test(m) && /email/i.test(m)) {
+    return "That email address doesn't look right. Check it and try again.";
+  }
   if (/Failed to fetch|NetworkError/i.test(m)) {
     return "We couldn't reach KinWillow. Check your connection and try again.";
   }

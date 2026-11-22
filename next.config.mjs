@@ -51,6 +51,14 @@ const tokenPageHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  // Addresses people guess or link to; the content lives on the home page.
+  async redirects() {
+    return [
+      { source: "/pricing", destination: "/#pricing", permanent: false },
+      { source: "/checklist", destination: "/#checklist", permanent: false },
+      { source: "/how-it-works", destination: "/#how", permanent: false },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
