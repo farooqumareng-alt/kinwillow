@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { brandedEmail, sendEmail, siteUrl } from "@/lib/email";
 import { clientIp, withinLimits, tooManyRequests, HOUR } from "@/lib/rate-limit";
 
 // Password reset, step 1 (POST { email }): send the recovery email. The
@@ -20,17 +22,33 @@ export async function POST(req: Request) {
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) &&
     (await withinLimits([{ action: "reset:email", subject: cleanEmail, limit: 3, windowSeconds: HOUR }]));
   if (emailOk) {
-    const supabase = await createClient();
-    const origin = new URL(req.url).origin;
-    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-      // Only used if the Supabase recovery template still links with
-      // {{ .ConfirmationURL }}; supabase/templates/recovery.html links to
-      // /auth/confirm with a token hash instead, which also works when the
-      // email is opened on another device.
-      redirectTo: `${origin}/auth/callback?next=/reset-password`,
-    });
-    // Supabase rate-limits these itself; log anything else for the operator.
-    if (error) console.error("[auth] password reset email was not sent:", error.message);
+    // Make the one-time link ourselves and send it through our own sender,
+    // rather than Supabase's built-in mailer. An address with no account
+    // returns an error here and nothing is sent.
+    const service = createServiceClient();
+    const { data, error } = await service.auth.admin.generateLink({ type: "recovery", email: cleanEmail });
+    const tokenHash = data?.properties?.hashed_token;
+    if (!error && tokenHash) {
+      const link = `${siteUrl()}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery`;
+      const sent = await sendEmail({
+        to: cleanEmail,
+        from: "KinWillow <no-reply@kinwillow.com>",
+        subject: "Reset your KinWillow password",
+        html: brandedEmail({
+          heading: "Reset your KinWillow password",
+          bodyHtml: "<p>We received a request to reset the password for your KinWillow vault.</p>",
+          ctaLabel: "Choose a new password",
+          ctaUrl: link,
+          footnote:
+            "The button works once and expires soon. If you didn't ask for this, you can ignore this email — your password has not changed.",
+        }),
+        text:
+          "We received a request to reset the password for your KinWillow vault. Choose a new one here:\n\n" +
+          `${link}\n\n` +
+          "The link works once and expires soon. If you didn't ask for this, you can ignore this email.\n",
+      });
+      if (!sent) console.error("[auth] password reset email was not sent");
+    }
   }
   return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { friendlyError } from "@/lib/errors";
 import { suggestEmail } from "@/lib/email-typo";
 
@@ -31,30 +30,25 @@ export default function SignupPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { display_name: name, ...(partner ? { partner_code: partner } : {}) },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) {
-      setError(friendlyError(error.message));
-      setBusy(false);
-      return;
+    setNotice("");
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, partner }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        setError(friendlyError(json.error));
+      } else {
+        setNotice(
+          `We've sent an email to ${email.trim()}. Open it and press "Confirm my email" to open your vault. It can take a minute — check your spam folder too.`
+        );
+      }
+    } catch {
+      setError(friendlyError("Failed to fetch"));
     }
-    if (data.session) {
-      // The address has not been proven yet, so this session cannot open the
-      // vault. Drop it and send the new user through the normal sign-in,
-      // which emails the 6-digit code.
-      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-      window.location.assign("/login?created=1");
-    } else {
-      setNotice("Check your email to confirm your address — then sign in and your vault will be waiting.");
-      setBusy(false);
-    }
+    setBusy(false);
   }
 
   return (
