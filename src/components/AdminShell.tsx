@@ -6,6 +6,8 @@ const LINKS: Array<{ href: string; label: string; needs: Permission }> = [
   { href: "/admin/accounts", label: "Account lookup", needs: "accounts.view" },
   { href: "/admin/households", label: "Households", needs: "accounts.view" },
   { href: "/admin/inbox", label: "Inbox", needs: "inbox.manage" },
+  { href: "/admin/releases", label: "Emergency requests", needs: "releases.view" },
+  { href: "/admin/approvals", label: "Approvals", needs: "releases.manage" },
   { href: "/admin/log", label: "Staff log", needs: "log.view" },
   { href: "/admin/staff", label: "Staff", needs: "staff.manage" },
 ];

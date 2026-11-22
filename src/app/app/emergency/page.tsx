@@ -12,6 +12,8 @@ type Request = {
   state: string;
   requested_at: string;
   release_at: string;
+  held_at?: string | null;
+  staff_cancelled_at?: string | null;
 };
 type Contact = { id: string; name: string };
 
@@ -155,7 +157,11 @@ export default function EmergencyPage() {
               <div key={r.id} className="panel sans">
                 <strong>{contactName(r.trusted_contact_id)}</strong> · {r.request_class === "death" ? "reported a death" : "reported incapacity"} ·{" "}
                 <span className={`chip ${r.state === "waiting" ? "warn" : r.state === "released" ? "good" : r.state === "vetoed" ? "bad" : ""}`}>
-                  {STATE_NAMES[r.state] ?? r.state}
+                  {r.staff_cancelled_at
+                    ? "Cancelled by KinWillow after review"
+                    : r.state === "waiting" && r.held_at
+                      ? "Paused by KinWillow for review"
+                      : STATE_NAMES[r.state] ?? r.state}
                 </span>
                 <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>
                   Requested {new Date(r.requested_at).toLocaleString()} · {r.state === "waiting" ? "Releases automatically after" : "Waiting period ended"}{" "}

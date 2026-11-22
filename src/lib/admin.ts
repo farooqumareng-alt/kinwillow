@@ -54,6 +54,27 @@ export async function requireStaff(permission: Permission): Promise<StaffContext
 }
 
 /**
+ * Record something staff did in the customer's own activity log (one entry
+ * per vault they own), so the customer can see it. Never throws.
+ */
+export async function auditForCustomer(ctx: StaffContext, customerUserId: string, name: string): Promise<void> {
+  try {
+    const { data } = await ctx.service.from("households").select("id").eq("owner_id", customerUserId);
+    for (const h of (data ?? []) as Array<{ id: string }>) {
+      await ctx.service.rpc("append_audit", {
+        p_household: h.id,
+        p_actor: ctx.user.id,
+        p_action: `admin.${name}`,
+        p_entity: "profile",
+        p_entity_id: customerUserId,
+      });
+    }
+  } catch (err) {
+    console.error("[staff] could not write to the customer's activity log", err);
+  }
+}
+
+/**
  * Write one line to the staff log: who, what, to whom, why. Never throws —
  * but callers that change something should check the result and refuse to
  * proceed when the log cannot be written.

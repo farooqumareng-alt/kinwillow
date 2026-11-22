@@ -42,6 +42,7 @@ export async function GET(req: Request) {
     owner_notify_failed: 0,
     reminders_sent: 0,
     released: 0,
+    held: 0,
     release_failed: 0,
     contact_emails_retried: 0,
   };
@@ -81,7 +82,12 @@ export async function GET(req: Request) {
         continue;
       }
 
-      // 2. The wait is over: release.
+      // 2. The wait is over: release — unless staff have paused this request
+      //    for review (see /admin/releases).
+      if (releaseAt <= now && (request as { held_at?: string | null }).held_at) {
+        summary.held++;
+        continue;
+      }
       if (releaseAt <= now) {
         const result = await releaseRequest(service, request.id, { actor: null, requireOwnerNotified: true });
         if (result.ok) summary.released++;

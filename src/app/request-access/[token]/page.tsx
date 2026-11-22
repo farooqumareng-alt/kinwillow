@@ -35,7 +35,7 @@ export default async function RequestAccessPage({ params }: { params: Promise<{ 
       householdName = (data as unknown as { households: { name: string } }).households?.name ?? null;
       const { data: requests } = await service
         .from("disclosure_requests")
-        .select("state, requested_at, release_at")
+        .select("*")
         .eq("trusted_contact_id", contact.id)
         .order("requested_at", { ascending: false })
         .limit(1);
@@ -91,7 +91,11 @@ export default async function RequestAccessPage({ params }: { params: Promise<{ 
       )}
       {latest?.state === "vetoed" && (
         <div className="error sans" role="status" style={{ marginTop: 0, marginBottom: 20 }}>
-          <strong>Your last request was stopped by the account owner.</strong>
+          <strong>
+            {(latest as { staff_cancelled_at?: string | null }).staff_cancelled_at
+              ? "Your last request was stopped by KinWillow after a review."
+              : "Your last request was stopped by the account owner."}
+          </strong>
           <p style={{ marginTop: 6 }}>
             Nothing was released. If the situation has changed, you can make a new request below.
           </p>

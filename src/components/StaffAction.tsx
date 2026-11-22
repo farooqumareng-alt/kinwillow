@@ -15,7 +15,11 @@ export async function runStaffAction(payload: Record<string, unknown>, what: str
       body: JSON.stringify({ ...payload, reason }),
     });
     const json = await res.json().catch(() => ({}));
-    return res.ok ? null : json.error || "That didn't work. Please try again.";
+    if (!res.ok) return json.error || "That didn't work. Please try again.";
+    if (json.pending) {
+      window.alert("Sent for approval. This needs a second staff member, who has been emailed. Nothing has changed yet.");
+    }
+    return null;
   } catch {
     return "We couldn't reach KinWillow. Check your connection and try again.";
   }

@@ -22,6 +22,17 @@ const LABELS: Record<string, string> = {
   "helper.left": "A helper stopped helping",
   "continuity.recovery_path_revealed": "Recovery instructions were viewed",
   "continuity.key_location_revealed": "An access-key location was viewed",
+  "admin.account_viewed": "KinWillow staff looked up your account details (not your vault's contents)",
+  "admin.password_reset_sent": "KinWillow staff sent you a password-reset email",
+  "admin.confirmation_sent": "KinWillow staff sent you a new confirmation link",
+  "admin.release_held": "KinWillow paused an emergency request for review",
+  "admin.release_hold_lifted": "KinWillow finished its review and the emergency request resumed",
+  "admin.release_cancelled": "KinWillow cancelled an emergency request after review",
+  "admin.household_sealed": "KinWillow staff made this vault read-only",
+  "admin.household_active": "KinWillow staff made this vault active again",
+  "admin.set_plan_free": "KinWillow staff changed your plan to Free",
+  "admin.set_plan_family": "KinWillow staff changed your plan to Family",
+  "admin.set_plan_family_parents": "KinWillow staff changed your plan to Family + Parents",
 };
 
 function describe(action: string): string {

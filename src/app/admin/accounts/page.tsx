@@ -1,4 +1,4 @@
-import { logStaffAction, staffGate, type StaffContext } from "@/lib/admin";
+import { auditForCustomer, logStaffAction, staffGate, type StaffContext } from "@/lib/admin";
 import { can } from "@/lib/staff";
 import { AdminBlocked, AdminHeader } from "@/components/AdminShell";
 import AccountTools from "@/components/AccountTools";
@@ -72,8 +72,21 @@ async function AccountDetail({ ctx, id }: { ctx: StaffContext; id: string }) {
   const profile = profileRow as Profile | null;
   if (!profile) return <p className="sans">That account no longer exists.</p>;
 
-  // Looking at a customer's account is itself recorded.
-  await logStaffAction(ctx, { action: "account.viewed", targetType: "account", targetId: id, targetLabel: profile.email });
+  // Looking at a customer's account is itself recorded — in the staff log and
+  // in the customer's own activity log. Reloading the page within half an
+  // hour counts as the same look.
+  const { data: recentView } = await service
+    .from("staff_actions")
+    .select("id")
+    .eq("action", "account.viewed")
+    .eq("target_id", id)
+    .eq("actor_id", ctx.user.id)
+    .gte("created_at", new Date(Date.now() - 30 * 60_000).toISOString())
+    .limit(1);
+  if (!recentView || recentView.length === 0) {
+    await logStaffAction(ctx, { action: "account.viewed", targetType: "account", targetId: id, targetLabel: profile.email });
+    if (id !== ctx.user.id) await auditForCustomer(ctx, id, "account_viewed");
+  }
 
   const [authUser, owned, memberships, staffLog] = await Promise.all([
     service.auth.admin.getUserById(id),
