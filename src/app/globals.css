@@ -195,3 +195,7 @@ nav.site span{margin-left:0 !important}
   .muted{color:#444 !important}
   @page{margin:18mm 16mm}
 }
+
+.field-error{color:#7c2d20;font-size:13.5px;margin-top:6px;text-align:left}
+.signup-block .field-error{color:#ffd9d2;flex-basis:100%;text-align:center}
+.tier .btn{margin-top:6px}

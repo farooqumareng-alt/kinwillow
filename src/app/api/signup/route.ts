@@ -47,9 +47,9 @@ export async function POST(req: Request) {
     html: brandedEmail({
       heading: "Your Family Continuity Checklist",
       bodyHtml:
-        "<p>Thank you for joining the KinWillow founding list.</p>" +
+        "<p>Thank you for asking for the KinWillow checklist.</p>" +
         "<p>Your free <strong>Family Continuity Checklist</strong> is ready. Work through it section by section — you're not writing down passwords; you're writing down where things are and how recovery works, so your family could find everything if anything happened to you.</p>" +
-        "<p>KinWillow turns this checklist into a living, secure vault with trusted contacts and renewal reminders. We'll write again when founding access opens.</p><p>— The KinWillow team</p>",
+        "<p>KinWillow turns this checklist into a living, secure vault with trusted contacts and renewal reminders. You can start a free vault whenever you're ready. This is the only email we'll send you about it.</p><p>— The KinWillow team</p>",
       ctaLabel: "Download the checklist (PDF)",
       ctaUrl: checklistUrl,
     }),
@@ -57,8 +57,8 @@ export async function POST(req: Request) {
   if (process.env.NOTIFY_EMAIL) {
     await sendEmail({
       to: process.env.NOTIFY_EMAIL,
-      subject: "New KinWillow checklist signup",
-      html: brandedEmail({ heading: "New checklist signup", bodyHtml: `<p>New founding-list signup: <strong>${escapeHtml(email)}</strong></p>` }),
+      subject: "New KinWillow checklist request",
+      html: brandedEmail({ heading: "New checklist request", bodyHtml: `<p>Checklist sent to: <strong>${escapeHtml(email)}</strong></p>` }),
     });
   }
   return NextResponse.json({ ok: true });

@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     const resendKey = process.env.RESEND_API_KEY;
     if (!resendKey) {
       return NextResponse.json(
-        { ok: false, error: "Email verification isn't switched on yet — your message is saved; please try again shortly." },
+        { ok: false, error: "Email verification isn't available right now, so nothing has been sent. Please try again later." },
         { status: 503 }
       );
     }
@@ -89,8 +89,17 @@ export async function POST(req: Request) {
       }),
     });
     if (!sent.ok) {
+      console.error(`[contact] verification email was refused with status ${sent.status}`);
+      // The mail provider refuses addresses that cannot receive mail (a typo'd
+      // or made-up domain). That is the sender's to fix, not a fault of ours.
+      if (sent.status === 422 || sent.status === 400) {
+        return NextResponse.json(
+          { ok: false, error: "We couldn't send a code to that email address. Please check it for typos — it needs to be an inbox you can open." },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { ok: false, error: "We couldn't send the verification email — your message is saved; please try again shortly." },
+        { ok: false, error: "We couldn't send the verification email just now, so nothing has been sent. Please try again in a few minutes." },
         { status: 502 }
       );
     }

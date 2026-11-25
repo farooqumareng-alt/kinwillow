@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
@@ -19,6 +20,11 @@ const LINKS = [
 
 export default function AppNav() {
   const pathname = usePathname();
+  // Vault pages are rendered in the browser, so the tab title is set here.
+  useEffect(() => {
+    const here = [...LINKS].reverse().find((l) => (l.href === "/app" ? pathname === "/app" : pathname.startsWith(l.href)));
+    document.title = `${here?.label ?? "Your vault"} — KinWillow`;
+  }, [pathname]);
   return (
     <nav className="app-nav app-nav--sidebar" aria-label="Vault menu">
       {LINKS.map((l) => {

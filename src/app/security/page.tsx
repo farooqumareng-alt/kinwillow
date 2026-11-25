@@ -1,3 +1,8 @@
+export const metadata = {
+  title: "Security — KinWillow",
+  description: "How KinWillow protects your vault: encryption, sign-in security, and what we never store.",
+};
+
 export default function SecurityPage() {
   return (
     <main className="narrow">

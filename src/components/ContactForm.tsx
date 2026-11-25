@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { FieldError, useFieldErrors } from "@/lib/field-errors";
 
 // One verified-message form, used two ways:
 //   - the general contact page (pick a topic, write a message);
@@ -33,6 +34,8 @@ function ContactFormInner({ mode }: { mode?: "partner" }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const v = useFieldErrors();
+  const vCode = useFieldErrors();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -96,7 +99,7 @@ function ContactFormInner({ mode }: { mode?: "partner" }) {
   }
   if (step === "code") {
     return (
-      <form className="card sans" onSubmit={verify}>
+      <form className="card sans" {...vCode.form(verify)}>
         <p>
           We emailed a 6-digit verification code to <strong>{form.email}</strong>. Enter it here to
           send your {partner ? "application" : "message"} — this keeps spam bots out of the inbox.
@@ -113,6 +116,7 @@ function ContactFormInner({ mode }: { mode?: "partner" }) {
           required
           autoFocus
         />
+        <FieldError v={vCode} id="code" />
         {error && <div className="error" role="alert">{error}</div>}
         <button className="btn" type="submit" disabled={busy}>
           {busy ? "Checking…" : "Verify & send"}
@@ -121,11 +125,13 @@ function ContactFormInner({ mode }: { mode?: "partner" }) {
     );
   }
   return (
-    <form className="card sans" onSubmit={submit}>
+    <form className="card sans" {...v.form(submit)}>
       <label htmlFor="name">Your name</label>
       <input id="name" type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoComplete="name" />
+      <FieldError v={v} id="name" />
       <label htmlFor="email">{partner ? "Work email" : "Email"}</label>
       <input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required autoComplete="email" />
+      <FieldError v={v} id="email" />
       {partner ? (
         <>
           <label htmlFor="profession">What you do</label>
@@ -136,7 +142,8 @@ function ContactFormInner({ mode }: { mode?: "partner" }) {
           </select>
           <label htmlFor="business">Business or practice name</label>
           <input id="business" type="text" value={extra.business} onChange={(e) => setExtra({ ...extra, business: e.target.value })} required maxLength={120} autoComplete="organization" />
-          <label htmlFor="clients">Roughly how many clients do you help each year?</label>
+          <FieldError v={v} id="business" />
+          <label htmlFor="clients">Roughly how many clients do you help each year? (optional)</label>
           <input id="clients" type="text" inputMode="numeric" value={extra.clients} onChange={(e) => setExtra({ ...extra, clients: e.target.value })} maxLength={20} />
           <label htmlFor="message">Anything else we should know? (optional)</label>
           <textarea id="message" rows={4} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} maxLength={4000} style={{ width: "100%" }} />
@@ -155,13 +162,14 @@ function ContactFormInner({ mode }: { mode?: "partner" }) {
           </select>
           <label htmlFor="message">Message</label>
           <textarea id="message" rows={6} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} required style={{ width: "100%" }} />
+          <FieldError v={v} id="message" />
         </>
       )}
       {/* Honeypot — humans never see this */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} style={{ display: "none" }} aria-hidden="true" />
       {error && <div className="error" role="alert">{error}</div>}
       <button className="btn" type="submit" disabled={busy}>
-        {busy ? "One moment…" : partner ? "Send my application" : "Continue"}
+        {busy ? "One moment…" : partner ? "Send my application" : "Send message"}
       </button>
       <p className="sans" style={{ fontSize: 13, color: "var(--muted)", marginTop: 12 }}>
         We&rsquo;ll email you a short code to confirm the address is yours before {partner ? "the application" : "the message"} sends.

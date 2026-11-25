@@ -67,11 +67,15 @@ export default function Home() {
         <h2>Simple, annual pricing</h2>
         <p className="lede">Annual plans only — this is a once-a-year job, and we price it that way. Monthly pricing invites the churn we&rsquo;re protecting you from.</p>
         <div className="pricing">
-          <div className="tier"><h3>Free</h3><div className="price">$0</div><div className="per">to start</div><ul><li>Up to 25 items</li><li>1 trusted contact</li><li>Renewal alerts</li></ul></div>
-          <div className="tier featured"><h3>Family</h3><div className="price">$79</div><div className="per">per year</div><ul><li>Unlimited items</li><li>5 trusted contacts</li><li>Emergency access</li><li>Legacy-setting guides</li></ul></div>
-          <div className="tier"><h3>Family + Parents</h3><div className="price">$129</div><div className="per">per year</div><ul><li>Two households</li><li>Everything in Family</li><li>Set up your parents&rsquo; vault too</li></ul></div>
+          <div className="tier"><h3>Free</h3><div className="price">$0</div><div className="per">to start</div><ul><li>Up to 25 items</li><li>1 trusted contact</li><li>Renewal alerts</li></ul><a className="btn btn-secondary sans" href="/signup">Start free</a></div>
+          <div className="tier featured"><h3>Family</h3><div className="price">$79</div><div className="per">per year</div><ul><li>Unlimited items</li><li>5 trusted contacts</li><li>Emergency access</li><li>Legacy-setting guides</li></ul><a className="btn sans" href="/signup?plan=family">Choose Family</a></div>
+          <div className="tier"><h3>Family + Parents</h3><div className="price">$129</div><div className="per">per year</div><ul><li>Two households</li><li>Everything in Family</li><li>Set up your parents&rsquo; vault too</li></ul><a className="btn btn-secondary sans" href="/signup?plan=family_parents">Choose Family + Parents</a></div>
         </div>
-        <p className="lede sans" style={{ marginTop: 26, fontSize: 15 }}>
+        <p className="lede sans" style={{ marginTop: 22, fontSize: 15 }}>
+          Every plan starts as a free vault with no card. Paid plans are chosen inside the vault,
+          under Billing, and you can change or cancel there at any time.
+        </p>
+        <p className="lede sans" style={{ marginTop: 14, fontSize: 15 }}>
           Coming next on the same account: <strong>Renewals</strong> — everything that expires, on one
           calendar — and <strong>Scam Shield</strong> — forward a suspicious message, and your family
           gets alerted.

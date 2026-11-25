@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { FieldError, useFieldErrors } from "@/lib/field-errors";
 
 // Sign-in: step 1 checks email + password and emails a 6-digit code; step 2
 // verifies the code before any usable session exists; step 3 (only when an
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
+  const v = useFieldErrors();
 
   // Read the query string on the client (keeps this page statically renderable).
   useEffect(() => {
@@ -207,11 +209,13 @@ export default function LoginPage() {
   return (
     <main className="page">
       <h1 style={{ textAlign: "center" }}>Sign in</h1>
-      <form className="card sans" onSubmit={submitPassword}>
+      <form className="card sans" {...v.form(submitPassword)}>
         <label htmlFor="email">Email</label>
         <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+        <FieldError v={v} id="email" />
         <label htmlFor="password">Password</label>
         <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+        <FieldError v={v} id="password" />
         {info && <div className="notice" role="status">{info}</div>}
         {error && <div className="error" role="alert">{error}</div>}
         <button className="btn" type="submit" disabled={busy}>{busy ? "Sending code…" : "Continue"}</button>

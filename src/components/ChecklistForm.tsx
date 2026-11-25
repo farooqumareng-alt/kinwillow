@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
+import { FieldError, useFieldErrors } from "@/lib/field-errors";
 
 export default function ChecklistForm() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "busy" | "done" | "fallback">("idle");
+  const v = useFieldErrors();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,8 +24,9 @@ export default function ChecklistForm() {
 
   return (
     <>
-      <form className="inline sans" onSubmit={submit}>
+      <form className="inline sans" {...v.form(submit)}>
         <input
+          id="checklist-email"
           type="email"
           placeholder="Your email address"
           required
@@ -34,11 +37,12 @@ export default function ChecklistForm() {
         <button className="btn btn-accent" type="submit" disabled={state === "busy"}>
           {state === "busy" ? "One moment…" : "Send me the checklist"}
         </button>
+        <FieldError v={v} id="checklist-email" />
       </form>
       <p className="form-note sans">One email with your checklist. No spam, no selling your address — ever.</p>
       {state === "done" && (
         <div className="done-msg">
-          Thank you — you&rsquo;re on the founding list, and your checklist is ready:{" "}
+          Thank you — we&rsquo;ve emailed your checklist, and you can also get it right here:{" "}
           <a href="/Family-Continuity-Checklist.pdf" download>
             <strong>Download the Family Continuity Checklist (PDF)</strong>
           </a>
